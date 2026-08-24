@@ -184,6 +184,104 @@ for name, document in result.items():
     print("Lines:", document["element_count"])
     print("Chunks:", document["chunk_count"])
 ```
+## Expected Output
+
+The expected output from:
+
+```python
+result = process_documents(Doc1, Doc2)
+```
+
+is a dictionary containing the processed result for both documents.
+
+### Expected Output Structure
+
+```python
+result = {
+    "document_a": {
+        "document_id": "document_a",
+        "source_path": "/path/to/document_a.pdf",
+        "element_count": 1149,
+        "chunk_count": 33,
+        "chunks": [
+            {
+                "chunk_id": "document_a_0001",
+                "text": "...",
+                "page_start": 1,
+                "page_end": 1,
+                "heading_path": [
+                    "..."
+                ]
+            },
+            {
+                "chunk_id": "document_a_0002",
+                "text": "...",
+                "page_start": 2,
+                "page_end": 2,
+                "heading_path": [
+                    "..."
+                ]
+            }
+        ]
+    },
+
+    "document_b": {
+        "document_id": "document_b",
+        "source_path": "/path/to/document_b.pdf",
+        "element_count": 438,
+        "chunk_count": 23,
+        "chunks": [
+            {
+                "chunk_id": "document_b_0001",
+                "text": "...",
+                "page_start": 1,
+                "page_end": 1,
+                "heading_path": [
+                    "..."
+                ]
+            }
+        ]
+    }
+}
+```
+
+### Document Structure
+
+Each document contains:
+
+- `document_id` — identifier for the source document
+- `source_path` — original PDF path
+- `element_count` — number of extracted PDF elements
+- `chunk_count` — number of generated chunks
+- `chunks` — hierarchy-aware text chunks
+
+### Chunk Structure
+
+Each chunk consists of:
+
+```python
+{
+    "chunk_id": "...",
+    "text": "...",
+    "page_start": ...,
+    "page_end": ...,
+    "heading_path": [...]
+}
+```
+
+Each chunk contains:
+
+- `chunk_id` — unique chunk identifier
+- `text` — extracted contract/policy text
+- `page_start` — starting PDF page
+- `page_end` — ending PDF page
+- `heading_path` — structural hierarchy associated with the chunk
+
+### Node 2 Input
+
+The primary output passed to Node 2 is the `chunks` collection.
+
+Text is used for embedding, while document, page, and hierarchy information is retained as metadata.
 
 This verifies that:
 
