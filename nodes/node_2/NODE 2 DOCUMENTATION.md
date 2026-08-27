@@ -1858,43 +1858,6 @@ Node 2 therefore acts as the **search and indexing layer between document ingest
 Node 1 is responsible for extracting and structurally chunking the documents. Node 2 transforms those chunks into searchable representations. Node 3 subsequently uses Node 2 to retrieve relevant information for document alignment. This matches the overall project workflow, where Node 3 pulls data from Node 2 and compares corresponding document chunks. :contentReference[oaicite:3]{index=3}
 
 ---
-
-# Current Implementation Status
-
-## Completed
-
-- Structured chunk preparation.
-- Chunk validation.
-- Version metadata support.
-- Lightweight embedding generation.
-- FAISS vector indexing.
-- BM25 keyword indexing.
-- NetworkX knowledge graph.
-- Stakeholder relationships.
-- Legal-term relationships.
-- Date relationships.
-- Semantic retrieval.
-- Keyword retrieval.
-- Graph retrieval.
-- Multi-entity graph intersection.
-- Hybrid semantic + BM25 retrieval.
-- FAISS → chunk ID mapping.
-- BM25 → chunk ID mapping.
-- Public Node 2 API through `__init__.py`.
-- Full two-document end-to-end testing.
-
-## Current Test Dataset
-
-The implementation has been tested using:
-
-```text
-Document A → 33 chunks
-Document B → 23 chunks
-Total      → 56 chunks
-```
-
-The complete indexing and retrieval pipeline successfully processed all 56 chunks.
-
 ## Versioning Status
 
 The current implementation carries:
