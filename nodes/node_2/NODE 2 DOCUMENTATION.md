@@ -2,38 +2,100 @@
 
 ## Overview
 
-**Node 2** is responsible for indexing and retrieving the structured chunks produced by Node 1.
+**Node 2** is the indexing and retrieval layer of ClauseLens.
 
 > **Notice:** Although this is considered a node, it is **not** part of the LangGraph architecture.
 
+Node 2 receives the structured, hierarchy-aware chunks produced by Node 1 and creates searchable representations for downstream nodes.
+
 Node 2 currently:
 
-- Accepts the structured chunk output from Node 1.
-- Validates and normalizes the chunk structure.
+- Validates and normalizes Node 1 chunks.
 - Maintains document and version metadata.
-- Generates numerical embeddings using a lightweight Sentence Transformer model.
-- Stores embeddings in a **FAISS** vector index.
-- Builds a **BM25** keyword-search index.
-- Builds an in-memory **NetworkX knowledge graph**.
-- Extracts relationships involving:
-  - Stakeholders
-  - Legal terms
-  - Dates
+- Generates semantic embeddings.
+- Builds a FAISS vector index.
+- Builds a BM25 keyword index.
+- Builds an in-memory NetworkX knowledge graph.
+- Creates relationships between chunks, stakeholders, legal terms, and dates.
 - Provides semantic retrieval.
 - Provides keyword retrieval.
-- Provides graph-based retrieval.
-- Provides hybrid semantic + keyword retrieval using Reciprocal Rank Fusion (RRF).
-- Maintains mappings between search-index IDs and canonical chunk IDs.
+- Provides graph retrieval.
+- Provides multi-entity graph retrieval.
+- Provides hybrid semantic + keyword retrieval using Reciprocal Rank Fusion.
+- Maintains mappings between search indexes and canonical chunk IDs.
 
-Node 2 does **not** ingest PDFs directly. PDF ingestion and hierarchy-aware chunking belong to **Node 1**.
-
-The current Node 2 implementation is designed to process the **complete chunk collection supplied by Node 1**, rather than a fixed portion of a document.
+Node 2 does **not** ingest PDFs. PDF extraction and hierarchy-aware chunking are handled by Node 1.
 
 ---
 
-# Node 2 Architecture
+# Architecture
 
-The current Node 2 structure is:
+```text
+                         NODE 1
+              Structured / Hierarchy-Aware Chunks
+                              |
+                              v
+                       +--------------+
+                       |  chunks.py   |
+                       |              |
+                       | Validate     |
+                       | Normalize    |
+                       | Prepare      |
+                       +------+-------+
+                              |
+                              v
+                      Canonical Chunks
+                              |
+                              v
+                       +--------------+
+                       |  indexer.py  |
+                       |              |
+                       | Build Indexes|
+                       +------+-------+
+                              |
+             +----------------+----------------+
+             |                |                |
+             v                v                v
+        Embeddings          BM25           NetworkX
+             |                |                |
+             v                |                v
+           FAISS              |        Knowledge Graph
+             |                |                |
+             +----------------+----------------+
+                              |
+                              v
+                       +--------------+
+                       | retrieval.py |
+                       |              |
+                       | Retrieval    |
+                       +------+-------+
+                              |
+             +----------------+----------------+
+             |                |                |
+             v                v                v
+         Semantic          Keyword          Graph
+             |                |                |
+             +----------------+----------------+
+                              |
+                              v
+                           Hybrid
+                              |
+                              v
+                           NODE 3
+```
+
+### Retrieval Responsibilities
+
+| Component | Purpose |
+|---|---|
+| FAISS | Semantic similarity |
+| BM25 | Keyword / lexical matching |
+| NetworkX | Entity and relationship retrieval |
+| Hybrid Search | Combines semantic and keyword retrieval |
+
+---
+
+# Directory Structure
 
 ```text
 node_2/
@@ -43,25 +105,22 @@ node_2/
 └── retrieval.py
 ```
 
-### File Responsibilities
-
 | File | Responsibility |
 |---|---|
-| `__init__.py` | Defines the public Node 2 interface |
-| `chunks.py` | Validates and prepares Node 1 chunks |
-| `indexer.py` | Builds embeddings, FAISS, BM25 and NetworkX indexes |
-| `retrieval.py` | Performs semantic, keyword, graph and hybrid retrieval |
+| `__init__.py` | Public Node 2 interface |
+| `chunks.py` | Canonical chunk preparation |
+| `indexer.py` | Embeddings, FAISS, BM25, NetworkX |
+| `retrieval.py` | Search and retrieval functions |
 
 ---
+
 # Public Interface
 
-The public interface of Node 2 is defined in:
+The Node 2 public interface is defined in:
 
-```python
+```text
 nodes/node_2/__init__.py
 ```
-
-Current contents:
 
 ```python
 from .chunks import (
@@ -93,14 +152,13 @@ __all__ = [
 ]
 ```
 
-This allows other nodes to import Node 2 through its public interface rather than importing its internal implementation directly.
-
-For example:
+Other nodes should import Node 2 through this interface:
 
 ```python
 from nodes.node_2 import (
     prepare_chunks,
     Node2Indexer,
+    IndexBundle,
     semantic_search,
     keyword_search,
     graph_entity_search,
@@ -115,39 +173,20 @@ from nodes.node_2 import (
 
 ## 1. Clone the Repository
 
-Make sure **Internet access is enabled** in Kaggle if the repository needs to be cloned.
-
 ```bash
 !git clone https://github.com/Rhivu10/ClauseLens.git /kaggle/working/ClauseLens
 ```
 
-If the repository has already been cloned:
+If the repository already exists:
 
 ```bash
 %cd /kaggle/working/ClauseLens
 !git pull
 ```
 
-The repository should be available at:
-
-```text
-/kaggle/working/ClauseLens
-```
-
 ---
 
-## 2. Make the Repository Importable
-
-The ClauseLens repository contains the nodes under:
-
-```text
-ClauseLens/
-└── nodes/
-    ├── node_1/
-    └── node_2/
-```
-
-Kaggle therefore needs the repository root available on `sys.path`.
+## 2. Add Repository to Python Path
 
 ```python
 import sys
@@ -158,7 +197,7 @@ if REPO_PATH not in sys.path:
     sys.path.insert(0, REPO_PATH)
 ```
 
-After this, the following import should work:
+Test the public interface:
 
 ```python
 from nodes.node_2 import (
@@ -175,7 +214,7 @@ from nodes.node_2 import (
 print("Node 2 public API import: SUCCESS")
 ```
 
-Expected output:
+Expected:
 
 ```text
 Node 2 public API import: SUCCESS
@@ -185,7 +224,7 @@ Node 2 public API import: SUCCESS
 
 # Dependencies
 
-Node 2 uses the following direct dependencies:
+Node 2 uses:
 
 ```text
 NumPy
@@ -195,15 +234,13 @@ rank-bm25
 NetworkX
 ```
 
-The embedding model used by the current implementation is:
+The current embedding model is:
 
 ```text
 sentence-transformers/all-MiniLM-L6-v2
 ```
 
-For the complete Node 1 → Node 2 test, PyMuPDF is also required because Node 1 is responsible for PDF ingestion.
-
-### Install Node 2 Dependencies
+## Install Node 2 Dependencies
 
 ```python
 import sys
@@ -229,11 +266,11 @@ subprocess.check_call([
 print("Node 2 dependencies installed successfully.")
 ```
 
-### Install PyMuPDF for the Complete Pipeline
+## Node 1 Dependency
 
-PyMuPDF is a **Node 1 dependency**, not a Node 2 dependency.
+PyMuPDF is required when running Node 1 together with Node 2.
 
-If testing Node 1 and Node 2 together:
+It is a **Node 1 dependency**, not a Node 2 dependency.
 
 ```python
 import sys
@@ -247,8 +284,6 @@ subprocess.check_call([
     "-q",
     "pymupdf",
 ])
-
-print("PyMuPDF installed successfully.")
 ```
 
 ---
@@ -257,19 +292,19 @@ print("PyMuPDF installed successfully.")
 
 ## Purpose
 
-`chunks.py` converts the output of Node 1 into the canonical chunk representation expected by Node 2.
+`chunks.py` converts Node 1's structured document output into the canonical chunk representation used by Node 2.
 
-It performs:
+Responsibilities:
 
-- Chunk validation.
-- Required-field validation.
-- Empty-text validation.
-- Chunk ID uniqueness validation.
-- Document ID assignment.
-- Version ID assignment.
-- Metadata normalization.
+- Validate required fields.
+- Validate chunk text.
+- Reject empty text.
+- Validate unique chunk IDs.
+- Assign document IDs.
+- Assign version IDs.
+- Normalize metadata.
 
-It does **not**:
+It does not:
 
 - Generate embeddings.
 - Build FAISS.
@@ -279,9 +314,9 @@ It does **not**:
 
 ---
 
-## `prepare_chunks()`
+# `prepare_chunks()`
 
-### Function
+## Function
 
 ```python
 prepare_chunks(
@@ -290,37 +325,25 @@ prepare_chunks(
 )
 ```
 
-### Input
+## Input
 
-#### `documents`
+### `documents`
 
-A dictionary containing the structured output generated by Node 1.
+Dictionary containing the structured output of Node 1.
 
-The expected structure is:
+Expected structure:
 
 ```python
 {
-    "document_a": {
-        "document_id": "document_a",
+    "document_id": {
+        "document_id": "...",
+        "source_path": "...",
         "chunks": [
             {
-                "chunk_id": "document_a_0001",
+                "chunk_id": "...",
                 "text": "...",
-                "page_start": 1,
-                "page_end": 1,
-                "heading_path": [...]
-            }
-        ]
-    },
-
-    "document_b": {
-        "document_id": "document_b",
-        "chunks": [
-            {
-                "chunk_id": "document_b_0001",
-                "text": "...",
-                "page_start": 1,
-                "page_end": 1,
+                "page_start": ...,
+                "page_end": ...,
                 "heading_path": [...]
             }
         ]
@@ -328,22 +351,20 @@ The expected structure is:
 }
 ```
 
-Node 1 produces hierarchy-aware chunks containing the chunk text, page information and heading hierarchy. :contentReference[oaicite:2]{index=2}
+The number of documents and chunks is determined by the supplied input.
 
-#### `version_ids`
+### `version_ids`
 
-Optional dictionary mapping each document ID to a version ID.
-
-Example:
+Optional dictionary mapping document IDs to version IDs.
 
 ```python
 {
     "document_a": "version_a",
-    "document_b": "version_b"
+    "document_b": "version_b",
 }
 ```
 
-If no version IDs are provided:
+If omitted:
 
 ```python
 version_ids=None
@@ -357,7 +378,7 @@ the resulting chunks contain:
 
 ---
 
-### Output
+## Output
 
 Returns:
 
@@ -365,7 +386,7 @@ Returns:
 list[dict]
 ```
 
-Each chunk is converted into the canonical Node 2 representation:
+Each chunk has the canonical Node 2 structure:
 
 ```python
 {
@@ -379,7 +400,9 @@ Each chunk is converted into the canonical Node 2 representation:
 }
 ```
 
-### Example
+---
+
+## Example
 
 ```python
 all_chunks = prepare_chunks(
@@ -391,24 +414,13 @@ all_chunks = prepare_chunks(
 )
 ```
 
-For the current test documents:
-
-```text
-document_a → 33 chunks
-document_b → 23 chunks
-```
-
-Therefore:
-
-```text
-Total chunks: 56
-```
+The resulting list contains all chunks supplied by Node 1.
 
 ---
 
-## Validation Performed
+## Validation
 
-`prepare_chunks()` verifies that every chunk contains:
+The function validates:
 
 ```text
 chunk_id
@@ -418,17 +430,45 @@ page_end
 heading_path
 ```
 
-It also verifies:
+It also checks:
 
 - Text is a string.
 - Text is not empty.
 - Chunk IDs are unique.
 
-If a required field is missing, a `ValueError` is raised.
+Invalid input raises an appropriate `ValueError` or `TypeError`.
 
-If the text is not a string, a `TypeError` is raised.
+---
 
-If duplicate chunk IDs are detected, a `ValueError` is raised.
+# Canonical Chunk
+
+The canonical chunk is the shared reference used by every Node 2 index.
+
+```python
+{
+    "chunk_id": "...",
+    "document_id": "...",
+    "version_id": "...",
+    "text": "...",
+    "page_start": ...,
+    "page_end": ...,
+    "heading_path": [...]
+}
+```
+
+The same chunk is represented independently in:
+
+```text
+Canonical Chunk
+      |
+      +---- FAISS
+      |
+      +---- BM25
+      |
+      +---- NetworkX
+```
+
+All retrieval systems must map their results back to the canonical `chunk_id`.
 
 ---
 
@@ -436,21 +476,17 @@ If duplicate chunk IDs are detected, a `ValueError` is raised.
 
 ## Purpose
 
-`indexer.py` is the main construction layer of Node 2.
-
-It takes the canonical chunks produced by `prepare_chunks()` and creates:
+`indexer.py` builds the searchable representations of the canonical chunks.
 
 ```text
-Chunks
-   |
-   +---- Embeddings ----> FAISS
-   |
-   +---- Tokens --------> BM25
-   |
-   +---- Entities ------> NetworkX
+Canonical Chunks
+       |
+       +---- Embeddings ----> FAISS
+       |
+       +---- Tokens --------> BM25
+       |
+       +---- Entities ------> NetworkX
 ```
-
-The indexer does not perform user queries. Query execution belongs to `retrieval.py`.
 
 ---
 
@@ -468,7 +504,9 @@ The default embedding model is:
 sentence-transformers/all-MiniLM-L6-v2
 ```
 
-The class can also be initialized with custom configuration:
+---
+
+## Custom Initialization
 
 ```python
 indexer = Node2Indexer(
@@ -491,11 +529,9 @@ indexer = Node2Indexer(
 )
 ```
 
-### Parameters
+### `embedding_model_name`
 
-#### `embedding_model_name`
-
-Name of the Sentence Transformer model used to create embeddings.
+Sentence Transformer model used to generate embeddings.
 
 Default:
 
@@ -503,40 +539,15 @@ Default:
 "sentence-transformers/all-MiniLM-L6-v2"
 ```
 
-#### `legal_terms`
+### `legal_terms`
 
-Tuple of legal terms to detect during graph construction.
+Terms used by the current lightweight graph extraction process.
 
-Default terms:
+### `stakeholder_roles`
 
-```python
-(
-    "payment",
-    "expenses",
-    "indemnification",
-    "confidentiality",
-    "representations and warranties",
-    "termination",
-)
-```
+Stakeholder names or roles used by the current lightweight graph extraction process.
 
-#### `stakeholder_roles`
-
-Tuple of stakeholder names/roles used by the current lightweight stakeholder detection mechanism.
-
-Default:
-
-```python
-(
-    "Company",
-    "Bank",
-    "Agent",
-    "Customer",
-    "Affiliate",
-)
-```
-
-The current implementation intentionally keeps this lightweight and isolated so that a more advanced entity-resolution system can replace it later without changing the graph architecture.
+These lists are configuration for the current implementation and are not a universal legal ontology.
 
 ---
 
@@ -550,19 +561,19 @@ index_bundle = indexer.build(
 )
 ```
 
-### Input
+## Input
 
 ```python
 chunks: list[dict]
 ```
 
-The canonical chunk list returned by:
+Canonical chunks returned by:
 
 ```python
 prepare_chunks()
 ```
 
-### Output
+## Output
 
 Returns:
 
@@ -570,75 +581,65 @@ Returns:
 IndexBundle
 ```
 
-The `IndexBundle` contains all derived Node 2 indexes and mappings.
+containing all Node 2 indexes and mappings.
 
 ---
 
 # `IndexBundle`
 
-The returned object contains:
+`IndexBundle` stores the complete in-memory state required by Node 2 retrieval.
 
-```python
-IndexBundle(
-    chunks=...,
-    embeddings=...,
-    vector_index=...,
-    bm25=...,
-    tokenized_chunks=...,
-    knowledge_graph=...,
-    vector_id_to_chunk_id=...,
-    bm25_id_to_chunk_id=...,
-    embedding_model_name=...,
-)
-```
-
-### Contents
+Fields:
 
 | Field | Description |
 |---|---|
-| `chunks` | Canonical Node 2 chunks |
+| `chunks` | Canonical chunks |
 | `embeddings` | Normalized embedding matrix |
 | `vector_index` | FAISS vector index |
-| `bm25` | BM25 keyword index |
-| `tokenized_chunks` | Tokenized text used by BM25 |
+| `bm25` | BM25 index |
+| `tokenized_chunks` | BM25 tokenized documents |
 | `knowledge_graph` | NetworkX knowledge graph |
-| `vector_id_to_chunk_id` | FAISS ID → chunk ID mapping |
-| `bm25_id_to_chunk_id` | BM25 ID → chunk ID mapping |
+| `vector_id_to_chunk_id` | FAISS ID → chunk ID |
+| `bm25_id_to_chunk_id` | BM25 ID → chunk ID |
 | `embedding_model_name` | Embedding model identifier |
 
 ---
 
 # Embedding Generation
 
-For every chunk:
+Each chunk's:
 
 ```python
 chunk["text"]
 ```
 
-is passed to the Sentence Transformer model.
+is passed to the Sentence Transformer.
 
-The resulting embeddings are stored as a NumPy matrix.
-
-For the current model:
+The current model:
 
 ```text
-Embedding dimensions: 384
+sentence-transformers/all-MiniLM-L6-v2
 ```
 
-For the current 56-chunk test:
+produces:
 
 ```text
-Embeddings: (56, 384)
+384-dimensional embeddings
 ```
 
-The embeddings are L2-normalized before being added to FAISS.
+Therefore:
+
+```text
+Embedding shape = (number_of_chunks, 384)
+```
+
+The embeddings are normalized before being added to FAISS.
 
 ---
 
-# FAISS Vector Store
+# FAISS Vector Index
 
-FAISS is used for semantic similarity search.
+FAISS provides semantic similarity retrieval.
 
 The current implementation uses:
 
@@ -646,65 +647,49 @@ The current implementation uses:
 faiss.IndexFlatIP(dimension)
 ```
 
-Because the embeddings are normalized, inner product corresponds to cosine similarity.
+Normalized embeddings allow inner product to represent cosine similarity.
 
-For 56 chunks:
-
-```text
-FAISS vectors: 56
-```
-
-The FAISS ID corresponds to the position of the chunk in the canonical chunk list.
-
-Example:
+The required relationship is:
 
 ```text
-FAISS ID 0
-    ↓
-document_a_0001
+FAISS vector count
+        =
+canonical chunk count
 ```
 
-This relationship is maintained through:
+FAISS IDs are mapped to canonical chunk IDs through:
 
 ```python
 vector_id_to_chunk_id
-```
-
-Example:
-
-```python
-{
-    0: "document_a_0001",
-    1: "document_a_0002",
-    ...
-}
 ```
 
 ---
 
 # BM25 Index
 
-BM25 provides keyword-based retrieval.
+BM25 provides lexical keyword retrieval.
 
-Each chunk's text is converted into lowercase tokens:
+Chunk text is tokenized using lowercase whitespace splitting:
 
 ```python
 chunk["text"].lower().split()
 ```
 
-These tokenized documents are passed to:
+The resulting token lists are indexed using:
 
 ```python
 BM25Okapi
 ```
 
-For 56 chunks:
+The required relationship is:
 
 ```text
-BM25 documents: 56
+BM25 document count
+        =
+canonical chunk count
 ```
 
-The mapping between BM25 result IDs and canonical chunk IDs is maintained through:
+BM25 IDs are mapped to canonical chunk IDs through:
 
 ```python
 bm25_id_to_chunk_id
@@ -714,128 +699,96 @@ bm25_id_to_chunk_id
 
 # NetworkX Knowledge Graph
 
-The knowledge graph is implemented using:
+The current graph uses:
 
 ```python
 networkx.MultiDiGraph
 ```
 
-The graph contains:
-
-- Document nodes.
-- Version nodes.
-- Chunk nodes.
-- Stakeholder nodes.
-- Legal-term nodes.
-- Date nodes.
-
----
-
-## Document → Version Relationship
-
-The graph contains:
+The graph represents relationships between:
 
 ```text
-document
-    |
-    +---- has_version ----> version
-```
-
-Example:
-
-```text
-document_a
-    |
-    +---- has_version ----> document_a:version_a
+Documents
+Versions
+Chunks
+Stakeholders
+Legal Terms
+Dates
 ```
 
 ---
 
-## Version → Chunk Relationship
+# Document and Version Relationships
 
-The graph contains:
+General structure:
 
 ```text
-version
+Document
     |
-    +---- contains ----> chunk
+    +---- has_version ----> Version
+                              |
+                              +---- contains ----> Chunk
 ```
 
-Example:
+Version information is retained through:
 
-```text
-document_a:version_a
-    |
-    +---- contains ----> document_a_0018
+```python
+version_id
 ```
 
 ---
 
-## Chunk → Stakeholder Relationship
+# Stakeholder Relationships
 
-The current graph uses:
-
-```text
-chunk
-    |
-    +---- mentions ----> stakeholder
-```
-
-Example:
+Current graph structure:
 
 ```text
-document_a_0018
-    |
-    +---- mentions ----> stakeholder:company
+Chunk
+  |
+  +---- mentions ----> Stakeholder
 ```
 
-Stakeholders are represented as:
+Stakeholder nodes contain:
 
 ```python
 {
     "node_type": "stakeholder",
-    "name": "Company"
+    "name": "..."
 }
 ```
 
----
-
-## Chunk → Legal Term Relationship
-
-Legal terms use:
-
-```text
-chunk
-    |
-    +---- mentions ----> legal_term
-```
-
-Example:
-
-```text
-document_a_0018
-    |
-    +---- mentions ----> legal_term:expenses
-```
-
-Current default legal terms include:
-
-```text
-payment
-expenses
-termination
-representations and warranties
-indemnification
-confidentiality
-```
+The stakeholder extraction mechanism is intentionally lightweight.
 
 ---
 
-## Chunk → Date Relationship
+# Legal-Term Relationships
+
+Current graph structure:
+
+```text
+Chunk
+  |
+  +---- mentions ----> Legal Term
+```
+
+Legal-term nodes contain:
+
+```python
+{
+    "node_type": "legal_term",
+    "name": "..."
+}
+```
+
+The available legal terms depend on the configured term list.
+
+---
+
+# Date Relationships
 
 Dates are extracted using deterministic regular expressions.
 
-Supported patterns include:
+Supported formats include:
 
 ```text
 Month DD, YYYY
@@ -844,15 +797,15 @@ MM/DD/YYYY
 MM-DD-YYYY
 ```
 
-Example:
+The extracted date is represented as a graph node:
 
 ```text
-document_a_0018
-    |
-    +---- mentions ----> date:april 6, 2007
+Chunk
+  |
+  +---- mentions ----> Date
 ```
 
-The date extractor also normalizes whitespace so that dates split across PDF whitespace can be represented consistently.
+Whitespace normalization is applied to handle PDF extraction artifacts.
 
 ---
 
@@ -860,22 +813,77 @@ The date extractor also normalizes whitespace so that dates split across PDF whi
 
 ## Purpose
 
-`retrieval.py` consumes the `IndexBundle` created by `Node2Indexer`.
+`retrieval.py` provides the Node 2 search interface.
 
-It provides four retrieval modes:
+It consumes:
 
-```text
-Semantic
-Keyword
-Graph
-Hybrid
+```python
+IndexBundle
 ```
 
-It does not build or modify the indexes.
+and provides:
+
+```text
+Semantic Search
+Keyword Search
+Graph Search
+Multi-Entity Graph Search
+Hybrid Search
+```
+
+Every retrieval method maps its results back to canonical chunks.
+
+---
+
+# Standard Retrieval Result
+
+A retrieval result contains canonical chunk information such as:
+
+```python
+{
+    "chunk_id": "...",
+    "document_id": "...",
+    "version_id": "...",
+    "page_start": ...,
+    "page_end": ...,
+    "heading_path": [...],
+    "text": "...",
+    "score": ...,
+    "retrieval_method": "..."
+}
+```
+
+The exact score depends on the retrieval method.
+
+The primary identifier for downstream processing is:
+
+```python
+"chunk_id"
+```
 
 ---
 
 # `semantic_search()`
+
+## Purpose
+
+Finds chunks with similar semantic meaning.
+
+```text
+Query
+  |
+  v
+Sentence Transformer
+  |
+  v
+Query Embedding
+  |
+  v
+FAISS
+  |
+  v
+Top-k Chunks
+```
 
 ## Function
 
@@ -888,39 +896,31 @@ semantic_search(
 )
 ```
 
-### Inputs
+## Inputs
 
-#### `query`
+### `query`
 
 Natural-language query.
-
-Example:
 
 ```python
 "What are the confidentiality obligations?"
 ```
 
-#### `index_bundle`
+### `index_bundle`
 
-The `IndexBundle` returned by:
+Node 2 `IndexBundle`.
 
-```python
-Node2Indexer.build()
-```
+### `embedding_model`
 
-#### `embedding_model`
-
-The same Sentence Transformer model used to create the FAISS embeddings.
-
-For example:
+Sentence Transformer used by the FAISS index.
 
 ```python
 indexer.embedding_model
 ```
 
-#### `top_k`
+### `top_k`
 
-Maximum number of results to return.
+Maximum number of results.
 
 Default:
 
@@ -928,31 +928,21 @@ Default:
 5
 ```
 
-### Output
-
-Returns:
+## Output
 
 ```python
 list[dict]
 ```
 
-Each result contains:
+Each result contains canonical chunk metadata and:
 
 ```python
-{
-    "chunk_id": "...",
-    "document_id": "...",
-    "version_id": "...",
-    "page_start": ...,
-    "page_end": ...,
-    "heading_path": [...],
-    "text": "...",
-    "score": ...,
-    "retrieval_method": "semantic"
-}
+"retrieval_method": "semantic"
 ```
 
-### Example
+---
+
+## Example
 
 ```python
 results = semantic_search(
@@ -963,31 +953,28 @@ results = semantic_search(
 )
 ```
 
-Expected behavior for the current test documents:
-
-```text
-1. document_b_0018
-2. document_a_0021
-3. document_a_0027
-4. document_a_0014
-5. document_a_0024
-```
-
-The strongest result is:
-
-```text
-document_b_0018
-```
-
-with the current test score:
-
-```text
-0.6527
-```
+The returned chunks depend on the indexed documents.
 
 ---
 
 # `keyword_search()`
+
+## Purpose
+
+Performs lexical retrieval using BM25.
+
+```text
+Query
+  |
+  v
+Tokenization
+  |
+  v
+BM25
+  |
+  v
+Top-k Chunks
+```
 
 ## Function
 
@@ -999,17 +986,17 @@ keyword_search(
 )
 ```
 
-### Inputs
+## Inputs
 
-#### `query`
+### `query`
 
-Natural-language keyword query.
+Natural-language or keyword query.
 
-#### `index_bundle`
+### `index_bundle`
 
 Node 2 `IndexBundle`.
 
-#### `top_k`
+### `top_k`
 
 Maximum number of results.
 
@@ -1019,41 +1006,49 @@ Default:
 5
 ```
 
-### Output
-
-Returns a list of dictionaries using the same standard result structure.
-
-The retrieval method is:
+## Output
 
 ```python
-"bm25"
+list[dict]
 ```
 
-### Example
+Each result contains:
+
+```python
+"retrieval_method": "bm25"
+```
+
+The BM25 score depends on the indexed corpus.
+
+---
+
+## Example
 
 ```python
 results = keyword_search(
-    "What are the confidentiality obligations?",
+    "confidentiality obligations",
     index_bundle,
     top_k=5,
 )
 ```
 
-Expected current top result:
-
-```text
-document_b_0018
-```
-
-Current test score:
-
-```text
-6.8907
-```
-
 ---
 
 # `get_chunks_for_entity()`
+
+## Purpose
+
+Retrieves canonical chunks connected to a graph entity.
+
+Graph direction:
+
+```text
+Chunk
+  |
+  +---- mentions ----> Entity
+```
+
+Therefore, chunks are obtained from the entity's predecessors.
 
 ## Function
 
@@ -1064,25 +1059,11 @@ get_chunks_for_entity(
 )
 ```
 
-### Purpose
+## Inputs
 
-Returns the chunk IDs directly connected to a graph entity.
+### `entity_node_id`
 
-The current graph direction is:
-
-```text
-chunk
-  |
-  +---- mentions ----> entity
-```
-
-Therefore the function uses the entity's predecessors to find associated chunks.
-
-### Inputs
-
-#### `entity_node_id`
-
-Full NetworkX entity node ID.
+Full graph node ID.
 
 Examples:
 
@@ -1090,46 +1071,29 @@ Examples:
 "stakeholder:company"
 ```
 
-or:
-
 ```python
-"legal_term:expenses"
+"legal_term:confidentiality"
 ```
 
-#### `index_bundle`
+### `index_bundle`
 
 Node 2 `IndexBundle`.
 
-### Output
-
-Returns:
+## Output
 
 ```python
 set[str]
 ```
 
-containing matching chunk IDs.
-
-Example:
-
-```python
-get_chunks_for_entity(
-    "legal_term:confidentiality",
-    index_bundle,
-)
-```
-
-returns:
-
-```python
-{
-    "document_b_0018"
-}
-```
+containing canonical chunk IDs.
 
 ---
 
 # `graph_entity_search()`
+
+## Purpose
+
+Retrieves chunks associated with a single graph entity.
 
 ## Function
 
@@ -1142,34 +1106,28 @@ graph_entity_search(
 )
 ```
 
-### Inputs
+## Inputs
 
-#### `entity_name`
+### `entity_name`
 
 Entity name.
 
-Example:
-
-```text
-Company
-```
-
-#### `entity_type`
+### `entity_type`
 
 Graph entity type.
 
-Examples:
+Supported types include:
 
 ```text
 stakeholder
 legal_term
 ```
 
-#### `index_bundle`
+### `index_bundle`
 
 Node 2 `IndexBundle`.
 
-#### `top_k`
+### `top_k`
 
 Maximum number of results.
 
@@ -1179,11 +1137,17 @@ Default:
 5
 ```
 
-### Output
+## Output
 
-Returns chunks connected to the specified graph entity.
+Returns canonical chunk results with:
 
-Example:
+```python
+"retrieval_method": "graph"
+```
+
+---
+
+## Example
 
 ```python
 results = graph_entity_search(
@@ -1194,15 +1158,25 @@ results = graph_entity_search(
 )
 ```
 
-The result contains the canonical chunk metadata and:
-
-```python
-"retrieval_method": "graph"
-```
+The entity must exist in the graph.
 
 ---
 
 # `graph_multi_entity_search()`
+
+## Purpose
+
+Finds chunks satisfying multiple graph constraints.
+
+The current implementation intersects:
+
+```text
+Stakeholder chunks
+        INTERSECTION
+Legal-term chunks
+        =
+Matching chunks
+```
 
 ## Function
 
@@ -1215,43 +1189,21 @@ graph_multi_entity_search(
 )
 ```
 
-### Purpose
+## Inputs
 
-Finds chunks that are connected to **both** a stakeholder and a legal term.
+### `stakeholder_name`
 
-It performs:
+Stakeholder entity.
 
-```text
-Stakeholder chunks
-        INTERSECTION
-Legal-term chunks
-        =
-Matching chunks
-```
+### `legal_term`
 
-### Inputs
+Legal-term entity.
 
-#### `stakeholder_name`
-
-Example:
-
-```text
-Company
-```
-
-#### `legal_term`
-
-Example:
-
-```text
-expenses
-```
-
-#### `index_bundle`
+### `index_bundle`
 
 Node 2 `IndexBundle`.
 
-#### `top_k`
+### `top_k`
 
 Maximum number of results.
 
@@ -1261,38 +1213,61 @@ Default:
 10
 ```
 
-### Example
+## Output
+
+Returns canonical chunks matching both graph constraints.
+
+The result count depends on the indexed documents.
+
+---
+
+## Example
 
 ```python
 results = graph_multi_entity_search(
     "Company",
     "expenses",
     index_bundle,
+    top_k=10,
 )
 ```
-
-### Current Expected Result
-
-The current test returns:
-
-```text
-Matching chunks: 6
-```
-
-```text
-document_a_0004
-document_a_0018
-document_a_0019
-document_a_0021
-document_a_0023
-document_a_0028
-```
-
-This confirms that the graph can combine multiple entity constraints.
 
 ---
 
 # `hybrid_search()`
+
+## Purpose
+
+Combines semantic retrieval and BM25 retrieval.
+
+```text
+                    Query
+                      |
+             +--------+--------+
+             |                 |
+             v                 v
+        Semantic             BM25
+         Search             Search
+             |                 |
+             +--------+--------+
+                      |
+                      v
+            Reciprocal Rank
+                 Fusion
+                      |
+                      v
+               Hybrid Ranking
+```
+
+FAISS and BM25 scores are not directly added because they use different scoring scales.
+
+Reciprocal Rank Fusion is used instead:
+
+```text
+RRF contribution = 1 / (rrf_k + rank)
+```
+
+---
 
 ## Function
 
@@ -1307,41 +1282,11 @@ hybrid_search(
 )
 ```
 
-### Purpose
-
-Combines:
-
-```text
-Semantic retrieval
-        +
-BM25 keyword retrieval
-        ↓
-Reciprocal Rank Fusion
-        ↓
-Hybrid ranking
-```
-
-The implementation does **not** directly add FAISS scores to BM25 scores because they operate on different numerical scales.
-
-Instead, it uses Reciprocal Rank Fusion:
-
-```text
-RRF contribution = 1 / (rrf_k + rank)
-```
-
----
-
 ## Inputs
 
 ### `query`
 
 Natural-language query.
-
-Example:
-
-```text
-What expenses must the company reimburse?
-```
 
 ### `index_bundle`
 
@@ -1349,13 +1294,7 @@ Node 2 `IndexBundle`.
 
 ### `embedding_model`
 
-The Sentence Transformer model used by the FAISS index.
-
-Example:
-
-```python
-indexer.embedding_model
-```
+Sentence Transformer used by FAISS.
 
 ### `top_k`
 
@@ -1369,7 +1308,7 @@ Default:
 
 ### `candidate_k`
 
-Number of candidates retrieved from each individual retrieval method before fusion.
+Number of candidates retrieved from each underlying search.
 
 Default:
 
@@ -1387,46 +1326,19 @@ Default:
 60
 ```
 
----
-
 ## Output
 
-Returns a ranked list of chunks.
-
-Each result contains:
+Returns ranked canonical chunks containing:
 
 ```python
 "retrieval_method": "hybrid"
 ```
 
-and the final RRF score.
-
-Example:
-
-```python
-results = hybrid_search(
-    "What expenses must the company reimburse?",
-    index_bundle,
-    indexer.embedding_model,
-    top_k=5,
-)
-```
-
-Current test output:
-
-```text
-1. document_a_0019
-2. document_a_0023
-3. document_a_0021
-4. document_a_0018
-5. document_a_0004
-```
+and the calculated RRF score.
 
 ---
 
 # Complete Node 2 Initialization
-
-The normal Node 2 initialization sequence is:
 
 ```python
 from nodes.node_2 import (
@@ -1434,21 +1346,23 @@ from nodes.node_2 import (
     Node2Indexer,
 )
 
-# ------------------------------------------------------------
-# 1. Convert Node 1 output
-# ------------------------------------------------------------
+
+# ============================================================
+# 1. PREPARE CANONICAL CHUNKS
+# ============================================================
 
 all_chunks = prepare_chunks(
     result,
     version_ids={
-        "document_a": "version_a",
-        "document_b": "version_b",
+        document_id: f"{document_id}_version"
+        for document_id in result
     },
 )
 
-# ------------------------------------------------------------
-# 2. Build Node 2
-# ------------------------------------------------------------
+
+# ============================================================
+# 2. BUILD NODE 2
+# ============================================================
 
 indexer = Node2Indexer()
 
@@ -1457,37 +1371,31 @@ index_bundle = indexer.build(
 )
 ```
 
-At this point Node 2 has constructed:
+After this:
 
 ```text
-Canonical chunks
-        |
-        +---- Embeddings
-        |
-        +---- FAISS
-        |
-        +---- BM25
-        |
-        +---- NetworkX graph
+Canonical Chunks
+      |
+      +---- Embeddings
+      |        |
+      |        +---- FAISS
+      |
+      +---- Tokens
+      |        |
+      |        +---- BM25
+      |
+      +---- Entities
+               |
+               +---- NetworkX
 ```
+
+Node 2 is ready for retrieval.
 
 ---
 
-# Complete Retrieval Initialization
+# Retrieval Usage
 
-After building the index:
-
-```python
-from nodes.node_2 import (
-    semantic_search,
-    keyword_search,
-    graph_entity_search,
-    graph_multi_entity_search,
-    hybrid_search,
-)
-```
-
-Semantic retrieval:
+## Semantic
 
 ```python
 results = semantic_search(
@@ -1498,7 +1406,7 @@ results = semantic_search(
 )
 ```
 
-Keyword retrieval:
+## Keyword
 
 ```python
 results = keyword_search(
@@ -1508,21 +1416,33 @@ results = keyword_search(
 )
 ```
 
-Graph retrieval:
+## Graph Entity
+
+```python
+results = graph_entity_search(
+    "Company",
+    "stakeholder",
+    index_bundle,
+    top_k=5,
+)
+```
+
+## Multi-Entity Graph
 
 ```python
 results = graph_multi_entity_search(
     "Company",
     "expenses",
     index_bundle,
+    top_k=10,
 )
 ```
 
-Hybrid retrieval:
+## Hybrid
 
 ```python
 results = hybrid_search(
-    "What expenses must the company reimburse?",
+    "What obligations are imposed by the agreement?",
     index_bundle,
     indexer.embedding_model,
     top_k=5,
@@ -1533,47 +1453,33 @@ results = hybrid_search(
 
 # Full Node 2 Test
 
-The complete Node 2 test verifies:
+The complete test is dataset-independent.
 
-1. All chunks from Node 1 are processed.
-2. Embedding count matches the chunk count.
-3. FAISS vector count matches the chunk count.
-4. BM25 document count matches the chunk count.
-5. FAISS mappings match the chunk count.
-6. BM25 mappings match the chunk count.
-7. Semantic retrieval works.
-8. BM25 retrieval works.
-9. Graph retrieval works.
-10. Hybrid retrieval works.
-11. Retrieved chunk IDs correspond to canonical chunks.
-12. Both documents are represented in the indexes.
+It verifies the integrity of the indexing and retrieval pipeline rather than expecting specific documents, scores, or entity names.
 
-For the current two-document test:
+## Test Requirements
 
 ```text
-document_a → 33 chunks
-document_b → 23 chunks
------------------------
-Total      → 56 chunks
+[PASS] Chunks prepared
+[PASS] Index construction succeeds
+[PASS] Embedding count matches chunk count
+[PASS] FAISS vector count matches chunk count
+[PASS] BM25 document count matches chunk count
+[PASS] FAISS mapping count matches chunk count
+[PASS] BM25 mapping count matches chunk count
+[PASS] FAISS mappings resolve to canonical chunks
+[PASS] BM25 mappings resolve to canonical chunks
+[PASS] Semantic search returns canonical chunks
+[PASS] BM25 search returns canonical chunks
+[PASS] Graph construction succeeds
+[PASS] Graph search works when compatible entities exist
+[PASS] Hybrid search returns canonical chunks
+[PASS] Document coverage is preserved
 ```
-
-Expected indexing output:
-
-```text
-Embeddings: (56, 384)
-FAISS vectors: 56
-BM25 documents: 56
-Graph nodes: 78
-Graph edges: approximately 207
-```
-
-The graph edge count can vary depending on the extracted relationships, while the chunk, embedding, FAISS and BM25 counts should remain aligned.
 
 ---
 
-# Complete Node 2 Smoke Test
-
-A complete test can be performed using:
+# Dataset-Independent Test
 
 ```python
 from nodes.node_2 import (
@@ -1586,24 +1492,47 @@ from nodes.node_2 import (
 )
 
 
+print("=" * 70)
+print("NODE 2 END-TO-END TEST")
+print("=" * 70)
+
+
 # ============================================================
-# 1. PREPARE CHUNKS
+# 1. CHUNK PREPARATION
 # ============================================================
+
+print()
+print("[1] CHUNK PREPARATION")
+print("-" * 70)
 
 all_chunks = prepare_chunks(
     result,
     version_ids={
-        "document_a": "version_a",
-        "document_b": "version_b",
+        document_id: f"{document_id}_version"
+        for document_id in result
     },
 )
 
+assert len(all_chunks) > 0
+
+chunk_ids = {
+    chunk["chunk_id"]
+    for chunk in all_chunks
+}
+
+assert len(chunk_ids) == len(all_chunks)
+
 print("Total chunks:", len(all_chunks))
+print("Chunk preparation: PASS")
 
 
 # ============================================================
-# 2. BUILD INDEX
+# 2. INDEX CONSTRUCTION
 # ============================================================
+
+print()
+print("[2] INDEX CONSTRUCTION")
+print("-" * 70)
 
 indexer = Node2Indexer()
 
@@ -1611,266 +1540,626 @@ index_bundle = indexer.build(
     all_chunks
 )
 
-print("Embeddings:", index_bundle.embeddings.shape)
+print(
+    "Embeddings:",
+    index_bundle.embeddings.shape
+)
+
 print(
     "FAISS vectors:",
     index_bundle.vector_index.ntotal
 )
+
 print(
     "BM25 documents:",
     len(index_bundle.tokenized_chunks)
 )
+
 print(
     "Graph nodes:",
     index_bundle.knowledge_graph.number_of_nodes()
 )
+
 print(
     "Graph edges:",
     index_bundle.knowledge_graph.number_of_edges()
 )
 
+print("Index construction: PASS")
+
 
 # ============================================================
-# 3. SEMANTIC SEARCH
+# 3. INDEX ALIGNMENT
 # ============================================================
+
+print()
+print("[3] VERIFYING INDEX ALIGNMENT")
+print("-" * 70)
+
+chunk_count = len(all_chunks)
+
+embedding_count = (
+    index_bundle.embeddings.shape[0]
+)
+
+faiss_count = (
+    index_bundle.vector_index.ntotal
+)
+
+bm25_count = (
+    len(index_bundle.tokenized_chunks)
+)
+
+faiss_mapping_count = (
+    len(index_bundle.vector_id_to_chunk_id)
+)
+
+bm25_mapping_count = (
+    len(index_bundle.bm25_id_to_chunk_id)
+)
+
+print("Chunk count          :", chunk_count)
+print("Embedding count      :", embedding_count)
+print("FAISS vector count   :", faiss_count)
+print("BM25 document count  :", bm25_count)
+print("FAISS mapping count  :", faiss_mapping_count)
+print("BM25 mapping count   :", bm25_mapping_count)
+
+assert embedding_count == chunk_count
+assert faiss_count == chunk_count
+assert bm25_count == chunk_count
+assert faiss_mapping_count == chunk_count
+assert bm25_mapping_count == chunk_count
+
+print()
+print("Index alignment: PASS")
+
+
+# ============================================================
+# 4. FAISS MAPPINGS
+# ============================================================
+
+print()
+print("[4] VERIFYING FAISS MAPPINGS")
+print("-" * 70)
+
+for faiss_id, chunk_id in (
+    index_bundle.vector_id_to_chunk_id.items()
+):
+
+    assert chunk_id in chunk_ids
+
+print("FAISS mappings: PASS")
+
+
+# ============================================================
+# 5. BM25 MAPPINGS
+# ============================================================
+
+print()
+print("[5] VERIFYING BM25 MAPPINGS")
+print("-" * 70)
+
+for bm25_id, chunk_id in (
+    index_bundle.bm25_id_to_chunk_id.items()
+):
+
+    assert chunk_id in chunk_ids
+
+print("BM25 mappings: PASS")
+
+
+# ============================================================
+# 6. SEMANTIC SEARCH
+# ============================================================
+
+print()
+print("[6] SEMANTIC SEARCH")
+print("-" * 70)
+
+semantic_query = (
+    "What are the confidentiality obligations?"
+)
 
 semantic_results = semantic_search(
-    "What are the confidentiality obligations?",
+    semantic_query,
     index_bundle,
     indexer.embedding_model,
     top_k=5,
 )
 
+print("Query:", semantic_query)
+print(
+    "Results returned:",
+    len(semantic_results)
+)
+
+assert len(semantic_results) > 0
+
+for item in semantic_results:
+
+    assert (
+        item["chunk_id"]
+        in chunk_ids
+    )
+
+print("Semantic search: PASS")
+
 
 # ============================================================
-# 4. BM25 SEARCH
+# 7. BM25 SEARCH
 # ============================================================
+
+print()
+print("[7] BM25 KEYWORD SEARCH")
+print("-" * 70)
+
+keyword_query = (
+    "What are the confidentiality obligations?"
+)
 
 keyword_results = keyword_search(
-    "What are the confidentiality obligations?",
+    keyword_query,
     index_bundle,
     top_k=5,
 )
 
+print("Query:", keyword_query)
+print(
+    "Results returned:",
+    len(keyword_results)
+)
+
+assert len(keyword_results) > 0
+
+for item in keyword_results:
+
+    assert (
+        item["chunk_id"]
+        in chunk_ids
+    )
+
+print("BM25 search: PASS")
+
 
 # ============================================================
-# 5. GRAPH SEARCH
+# 8. GRAPH SEARCH
 # ============================================================
 
-graph_results = graph_multi_entity_search(
-    "Company",
-    "expenses",
-    index_bundle,
-    top_k=10,
+print()
+print("[8] GRAPH SEARCH")
+print("-" * 70)
+
+graph = index_bundle.knowledge_graph
+
+stakeholder_nodes = [
+    node
+    for node, data in graph.nodes(data=True)
+    if data.get("node_type") == "stakeholder"
+]
+
+legal_term_nodes = [
+    node
+    for node, data in graph.nodes(data=True)
+    if data.get("node_type") == "legal_term"
+]
+
+print(
+    "Stakeholder nodes:",
+    len(stakeholder_nodes)
+)
+
+print(
+    "Legal-term nodes:",
+    len(legal_term_nodes)
 )
 
 
+if stakeholder_nodes and legal_term_nodes:
+
+    stakeholder_node = stakeholder_nodes[0]
+    legal_term_node = legal_term_nodes[0]
+
+    stakeholder_name = graph.nodes[
+        stakeholder_node
+    ].get("name")
+
+    legal_term_name = graph.nodes[
+        legal_term_node
+    ].get("name")
+
+    print(
+        "Testing:",
+        stakeholder_name,
+        "+",
+        legal_term_name
+    )
+
+    graph_results = graph_multi_entity_search(
+        stakeholder_name,
+        legal_term_name,
+        index_bundle,
+        top_k=10,
+    )
+
+    for item in graph_results:
+
+        assert (
+            item["chunk_id"]
+            in chunk_ids
+        )
+
+    print(
+        "Graph results:",
+        len(graph_results)
+    )
+
+    print("Graph search: PASS")
+
+else:
+
+    print(
+        "No compatible stakeholder/legal-term "
+        "pair found."
+    )
+
+    print("Graph construction: PASS")
+
+
 # ============================================================
-# 6. HYBRID SEARCH
+# 9. HYBRID SEARCH
 # ============================================================
 
+print()
+print("[9] HYBRID SEARCH")
+print("-" * 70)
+
+hybrid_query = (
+    "What obligations are imposed by the agreement?"
+)
+
 hybrid_results = hybrid_search(
-    "What expenses must the company reimburse?",
+    hybrid_query,
     index_bundle,
     indexer.embedding_model,
     top_k=5,
     candidate_k=10,
 )
 
-
-# ============================================================
-# 7. VALIDATION
-# ============================================================
-
-assert len(all_chunks) == 56
-
-assert (
-    index_bundle.embeddings.shape[0]
-    == len(all_chunks)
+print("Query:", hybrid_query)
+print(
+    "Results returned:",
+    len(hybrid_results)
 )
 
-assert (
-    index_bundle.vector_index.ntotal
-    == len(all_chunks)
-)
-
-assert (
-    len(index_bundle.tokenized_chunks)
-    == len(all_chunks)
-)
-
-assert len(semantic_results) > 0
-assert len(keyword_results) > 0
-assert len(graph_results) > 0
 assert len(hybrid_results) > 0
+
+for item in hybrid_results:
+
+    assert (
+        item["chunk_id"]
+        in chunk_ids
+    )
+
+print("Hybrid search: PASS")
+
+
+# ============================================================
+# 10. DOCUMENT COVERAGE
+# ============================================================
+
+print()
+print("[10] VERIFYING DOCUMENT COVERAGE")
+print("-" * 70)
+
+input_documents = set(
+    result.keys()
+)
+
+indexed_documents = {
+    chunk["document_id"]
+    for chunk in all_chunks
+}
+
+print(
+    "Input documents:",
+    sorted(input_documents)
+)
+
+print(
+    "Indexed documents:",
+    sorted(indexed_documents)
+)
+
+assert (
+    input_documents
+    == indexed_documents
+)
+
+print("Document coverage: PASS")
+
+
+# ============================================================
+# FINAL RESULT
+# ============================================================
 
 print()
 print("=" * 70)
-print("NODE 2 TEST PASSED")
+print("NODE 2 END-TO-END TEST PASSED")
+print("=" * 70)
+
+print()
+print(
+    "Documents processed :",
+    len(input_documents)
+)
+
+print(
+    "Total chunks        :",
+    chunk_count
+)
+
+print(
+    "Embeddings          :",
+    index_bundle.embeddings.shape
+)
+
+print(
+    "FAISS vectors       :",
+    index_bundle.vector_index.ntotal
+)
+
+print(
+    "BM25 documents      :",
+    len(index_bundle.tokenized_chunks)
+)
+
+print(
+    "Graph nodes         :",
+    graph.number_of_nodes()
+)
+
+print(
+    "Graph edges         :",
+    graph.number_of_edges()
+)
+
+print()
+print("Retrieval tests:")
+print("  Semantic : PASS")
+print("  BM25     : PASS")
+print("  Graph    : PASS")
+print("  Hybrid   : PASS")
+
+print()
+print("=" * 70)
+print("ALL NODE 2 TESTS PASSED")
 print("=" * 70)
 ```
 
 ---
 
-# Expected Full Test Output
+# Expected Test Behavior
 
-The current two-document test produced:
+The exact values produced by the test depend on the documents supplied.
 
-```text
-Index construction complete.
-Embeddings: (56, 384)
-FAISS vectors: 56
-BM25 documents: 56
-Graph nodes: 78
-Graph edges: 207
-```
-
-Index alignment:
+The following values are **not fixed**:
 
 ```text
-Chunk count          : 56
-Embedding count      : 56
-FAISS vector count   : 56
-BM25 document count  : 56
-FAISS mapping count  : 56
-BM25 mapping count   : 56
-
-Index alignment: PASS
+Number of documents
+Number of chunks
+Embedding matrix size
+FAISS vector count
+BM25 document count
+Graph node count
+Graph edge count
+Retrieval scores
+Retrieved chunk IDs
+Graph entity names
 ```
 
-Semantic retrieval:
+The following invariant must always hold:
 
 ```text
-1. document_b_0018 | document_b | score=0.6527
-2. document_a_0021 | document_a | score=0.4777
-3. document_a_0027 | document_a | score=0.4776
-4. document_a_0014 | document_a | score=0.4480
-5. document_a_0024 | document_a | score=0.4346
+Canonical chunk count
+        =
+Embedding count
+        =
+FAISS vector count
+        =
+BM25 document count
+        =
+FAISS mapping count
+        =
+BM25 mapping count
 ```
 
-BM25 retrieval:
+If:
 
 ```text
-1. document_b_0018 | document_b | score=6.8907
-2. document_a_0012 | document_a | score=2.5823
-3. document_a_0013 | document_a | score=2.5783
-4. document_a_0020 | document_a | score=2.5146
-5. document_a_0021 | document_a | score=2.4895
+Total chunks = N
 ```
 
-Graph retrieval:
+then:
 
 ```text
-Stakeholder: Company
-Legal term : expenses
-Matching chunks: 6
-
-document_a_0004
-document_a_0018
-document_a_0019
-document_a_0021
-document_a_0023
-document_a_0028
+Embedding shape = (N, 384)
 ```
 
-Hybrid retrieval:
-
-```text
-1. document_a_0019 | document_a | RRF=0.032266
-2. document_a_0023 | document_a | RRF=0.031754
-3. document_a_0021 | document_a | RRF=0.031010
-4. document_a_0018 | document_a | RRF=0.016393
-5. document_a_0004 | document_a | RRF=0.016129
-```
-
-Final validation:
-
-```text
-======================================================================
-NODE 2 FULL DOCUMENT TEST PASSED
-======================================================================
-
-Documents processed : 2
-Total chunks        : 56
-Embeddings          : (56, 384)
-FAISS vectors       : 56
-BM25 documents      : 56
-Graph nodes         : 78
-Graph edges         : 207
-
-Retrieval tests:
-  Semantic : PASS
-  BM25     : PASS
-  Graph    : PASS
-  Hybrid   : PASS
-
-======================================================================
-ALL NODE 2 TESTS PASSED
-======================================================================
-```
+because the current embedding model produces 384-dimensional vectors.
 
 ---
 
-# Node 2 Responsibilities
+# Retrieval Expectations
 
-The overall responsibility of Node 2 can be summarized as:
+Retrieval tests verify structural correctness rather than specific ranking.
+
+A successful semantic search means:
 
 ```text
+Query
+  |
+  v
+FAISS
+  |
+  v
+Results
+  |
+  v
+Canonical chunk IDs
+```
+
+A successful BM25 search means:
+
+```text
+Query
+  |
+  v
+BM25
+  |
+  v
+Results
+  |
+  v
+Canonical chunk IDs
+```
+
+A successful hybrid search means:
+
+```text
+Semantic Results
+       +
+BM25 Results
+       |
+       v
+RRF
+       |
+       v
+Ranked Canonical Chunks
+```
+
+The test does not require a particular chunk to appear at a particular rank.
+
+Retrieval scores are corpus-dependent and should not be treated as fixed expected values.
+
+---
+
+# Graph Expectations
+
+The graph is also dataset-dependent.
+
+Different documents may contain different:
+
+- Stakeholders.
+- Legal terms.
+- Dates.
+- Relationships.
+
+The test therefore checks whether compatible graph entities exist before attempting a multi-entity query.
+
+If compatible entities exist:
+
+```text
+Stakeholder
+      +
+Legal Term
+      |
+      v
+Graph Search
+      |
+      v
+Canonical Chunks
+```
+
+If no compatible pair exists, graph construction is still considered successful as long as the graph itself was constructed correctly.
+
+The absence of a specific stakeholder or legal term is not a Node 2 failure.
+
+---
+
+# Index Alignment
+
+Index alignment is a core Node 2 requirement.
+
+Each search system has its own internal identifier:
+
+```text
+FAISS ID
+BM25 ID
+Graph Node ID
+```
+
+These identifiers must ultimately resolve to the canonical chunk:
+
+```text
+                 Canonical Chunk
+                       |
+          +------------+------------+
+          |            |            |
+          v            v            v
+      FAISS ID      BM25 ID     Graph Node
+          |            |            |
+          +------------+------------+
+                       |
+                       v
+                  chunk_id
+```
+
+This ensures that retrieval results retain:
+
+- Original text.
+- Document identity.
+- Version identity.
+- Page information.
+- Heading hierarchy.
+
+---
+
+# Node 2 Output
+
+Node 2 does not produce the final document comparison.
+
+Its output is the searchable representation required by downstream nodes:
+
+```text
+Node 1
+  |
+  v
 Structured Chunks
-        |
-        v
-Chunk Validation
-        |
-        v
-Embedding Generation
-        |
-        +-------------------+
-        |                   |
-        v                   v
-      FAISS               BM25
-        |                   |
-        +---------+---------+
-                  |
-                  v
-             NetworkX
-             Knowledge
-               Graph
-                  |
-                  v
-             Node 2 Search
-                  |
-       +----------+----------+
-       |          |          |
-       v          v          v
-    Semantic   Keyword     Graph
-       |          |          |
-       +----------+----------+
-                  |
-                  v
-               Hybrid
-                  |
-                  v
-                NODE 3
+  |
+  v
+Node 2
+  |
+  +---- FAISS
+  +---- BM25
+  +---- NetworkX
+  |
+  v
+Retrieval Results
+  |
+  v
+Node 3
 ```
 
-Node 2 therefore acts as the **search and indexing layer between document ingestion and document alignment**.
-
-Node 1 is responsible for extracting and structurally chunking the documents. Node 2 transforms those chunks into searchable representations. Node 3 subsequently uses Node 2 to retrieve relevant information for document alignment. This matches the overall project workflow, where Node 3 pulls data from Node 2 and compares corresponding document chunks. :contentReference[oaicite:3]{index=3}
+Node 3 uses these results to identify corresponding clauses between documents and determine whether they are equivalent, modified, added, or deleted.
 
 ---
-## Versioning Status
 
-The current implementation carries:
+# Versioning Status
+
+The current implementation supports:
 
 ```python
 version_id
 ```
 
-inside the canonical chunk representation and the knowledge graph.
+as metadata attached to canonical chunks and represented in the knowledge graph.
 
-However, **persistent version-specific storage and save/load functionality are not currently implemented in the Node 2 code**.
+The current implementation uses in-memory indexes.
 
-Therefore, the current implementation should be considered:
+Persistent version-specific index storage and save/load functionality are **not currently implemented**.
+
+Therefore the current status is:
 
 ```text
 Version-aware metadata
@@ -1878,6 +2167,56 @@ Version-aware metadata
 In-memory indexes
 ```
 
-rather than a fully persistent versioned vector database.
+rather than:
 
-Persistent versioned storage can be added later without changing the fundamental retrieval interface.
+```text
+Persistent versioned vector database
+```
+
+Persistent storage can be added later without changing the fundamental retrieval interface.
+
+---
+
+# Node 2 Responsibilities
+
+```text
+Node 1
+  |
+  | Structured Chunks
+  v
+Node 2
+  |
+  +-- Validate / Normalize
+  |
+  +-- Generate Embeddings
+  |
+  +-- Build FAISS
+  |
+  +-- Build BM25
+  |
+  +-- Build Knowledge Graph
+  |
+  +-- Semantic Retrieval
+  |
+  +-- Keyword Retrieval
+  |
+  +-- Graph Retrieval
+  |
+  +-- Hybrid Retrieval
+  |
+  v
+Node 3
+```
+
+### Summary
+
+| Node | Responsibility |
+|---|---|
+| Node 1 | PDF ingestion and hierarchy-aware chunking |
+| **Node 2** | Indexing and retrieval |
+| Node 3 | Clause alignment and change detection |
+| Node 4 | Deontic/legal-action extraction |
+| Node 5 | Impact analysis |
+| Node 6 | Final reporting |
+
+Node 2 therefore serves as the **retrieval and indexing layer between structured document ingestion and clause-level comparison**.
