@@ -13,7 +13,8 @@ Node 4 currently:
 - Splits each clause into sentences, keeping character offsets into the original chunk text.
 - Finds trigger words with ordered regex rules (shall, must, may, shall not, prohibited, entitled to...).
 - Ignores definitions such as "shall mean" and "shall be deemed".
-- Asks Gemma for a quick check only on ambiguous sentences (weak cues such as "will", or mixed labels).
+- Asks Gemma for a quick check only on ambiguous sentences (weak cues such as "will", or mixed labels). Gemma may only choose among the labels the trigger words found, or NONE: it can confirm or cancel a label, never invent one.
+- Skips definition sentences (`"Affiliate" means ...`).
 - Reuses the Gemma model already loaded for Node 3, so it needs no extra GPU memory.
 - Processes pairs one at a time and saves each result to disk immediately, so a crashed session resumes where it stopped.
 
@@ -128,6 +129,7 @@ Rules run in this order. Each match masks its words, so "shall not" is counted o
 
 | Order | Label | Examples | Strength |
 |---|---|---|---|
+| 0 | *(whole sentence skipped)* | a quoted defined term followed by means / shall mean / has the meaning / refers to | — |
 | 1 | *(ignored)* | shall mean, shall have the meaning, shall include, shall be deemed | — |
 | 2 | PERMISSION (exemption) | shall not be required to, is not obligated to | strong |
 | 3 | PROHIBITION | shall not, must not, may not, in no event shall, neither party shall, is prohibited, prohibits, is not permitted to | strong |
@@ -202,7 +204,7 @@ A sentence is **ambiguous** when it has cues for more than one label, or only we
 }
 ```
 
-When Gemma overrides a label, the sentence also keeps `"regex_label"` with the original regex answer.
+When Gemma overrides a label, the sentence also keeps `"regex_label"` with the original regex answer. When Gemma's answer is unparseable or picks a label it was not offered, the regex label is kept and the answer is stored in `"gemma_raw"` for debugging.
 
 **How `shift` is decided.** In a MODIFIED pair, only the sentences that changed between versions are compared (`"changed": True`). A clause where "may sublicense" became "shall not sublicense" gives `PERMISSION -> PROHIBITION`, even if an unchanged "shall deliver" sentence sits in the same clause. If one side has no changed duty sentence, the whole-clause primary labels are compared instead.
 
@@ -227,7 +229,7 @@ With `checkpoint_path`, Node 4 writes a JSONL file:
 - Line 1 is a header with a fingerprint of the input (pair ids, chunk text and `model_check`).
 - Every finished pair is appended and flushed immediately.
 
-If the session crashes, run the same cell again: pairs already on disk are loaded instead of processed again. A half-written last line is skipped and redone. If the checkpoint was made from different documents or settings, Node 4 raises `ValueError` instead of mixing results. Delete the file or use a new path.
+If the session crashes, run the same cell again: pairs already on disk are loaded instead of processed again. A half-written last line is skipped and redone. If the checkpoint was made from different documents, settings or an older Node 4 version (`NODE4_VERSION` in `config.py`), Node 4 prints a notice and starts the file fresh instead of mixing results.
 
 ---
 
@@ -236,7 +238,7 @@ If the session crashes, run the same cell again: pairs already on disk are loade
 - **Regex coverage.** Unusual wording ("it is incumbent upon", "is hereby granted") is not in the rules. Add patterns to `_RULES` in `patterns.py` as they come up.
 - **"will" and "may" are broad.** "will" is treated as a weak obligation and checked by Gemma. "may" in a sentence like "this may result in" is tagged PERMISSION by regex; use `model_check="all"` if this matters.
 - **Chunk-level labels.** `primary_label` is the most frequent sentence label. A long chunk with many duties is better read through its `sentences` list.
-- **Model check accuracy.** The CUAD adapter was not trained on this classification prompt. Gemma's labels have not been measured against labeled sentences yet.
+- **Model check accuracy.** The CUAD adapter was not trained on this classification prompt. In the first Kaggle run, unconstrained Gemma turned plain "will pay" obligations into PROHIBITION, which is why its choices are now limited to the cue labels plus NONE. Its labels have not been measured against labeled sentences yet; `model_check="off"` gives regex-only results for comparison.
 - **Sentence splitting** is rule-based. Uncommon abbreviations can still split a sentence early.
 - **Only as good as Node 3.** Node 4 labels whichever pairs Node 3 marks as changed. With an uncalibrated Node 3 threshold, many pairs may be DELETED/ADDED rather than MODIFIED.
 

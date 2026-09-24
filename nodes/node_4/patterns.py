@@ -150,6 +150,13 @@ def label_sentence(cues: list[dict[str, Any]]) -> tuple[str, bool]:
     return label, ambiguous
 
 
+# A defined term: “Affiliate” means ... / "Term" shall have the meaning ...
+_DEFINITION_RE = re.compile(
+    r"[“\"][^”\"]{1,80}[”\"]\s+(?:means|shall\s+mean|has\s+the\s+meaning|shall\s+have\s+the\s+meaning|refers\s+to)\b",
+    re.I,
+)
+
+
 def tag_text(text: str) -> list[dict[str, Any]]:
     """
     Regex pass over one chunk. Returns only sentences that carry a cue:
@@ -158,6 +165,8 @@ def tag_text(text: str) -> list[dict[str, Any]]:
     """
     tagged = []
     for sent in split_sentences(text):
+        if _DEFINITION_RE.search(sent["text"]):
+            continue                      # definitions describe terms, they are not duties
         cues = find_cues(sent["text"])
         if not cues:
             continue

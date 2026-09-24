@@ -28,6 +28,7 @@ from typing import Any, Iterator
 from .checker import DeonticChecker
 from .config import (
     Node4Config,
+    NODE4_VERSION,
     LABEL_PRIORITY,
     NONE,
     MODIFIED,
@@ -111,11 +112,13 @@ class Node4Extractor:
 
         for s in sentences:
             if self.checker is not None and self._needs_model(s):
-                label = self.checker.classify(s["text"])
+                label, raw = self.checker.classify(s["text"], {c["label"] for c in s["cues"]})
                 if label is not None:
                     s["regex_label"] = s["label"]
                     s["label"] = label
                     s["decided_by"] = "gemma"
+                else:
+                    s["gemma_raw"] = raw      # unusable answer; regex label kept
 
         counts = Counter(s["label"] for s in sentences if s["label"] != NONE)
 
@@ -247,6 +250,7 @@ class Node4Extractor:
                 if cid:
                     h.update(self.chunk_by_id[cid]["text"].encode())
         h.update(self.config.model_check.encode())
+        h.update(NODE4_VERSION.encode())
         return h.hexdigest()[:16]
 
 
@@ -312,10 +316,8 @@ def _load_checkpoint(path: str, fingerprint: str) -> dict[str, dict[str, Any]]:
         except json.JSONDecodeError:
             return {}               # header never finished writing; start fresh
         if meta.get("fingerprint") != fingerprint:
-            raise ValueError(
-                f"Checkpoint {path} was made from different input. "
-                f"Delete it or use another checkpoint_path."
-            )
+            print(f"Checkpoint {path} is from different input or an older Node 4 — starting fresh.")
+            return {}
         for line in fh:
             try:
                 row = json.loads(line)

@@ -30,6 +30,10 @@ LABEL_PRIORITY = [PROHIBITION, OBLIGATION, PERMISSION, NONE]
 # CHANGE STATUS (from Node 3)
 # ============================================================
 
+# Bump when Node 4 logic changes; checkpoints from older versions are redone
+NODE4_VERSION = "2"
+
+
 MODIFIED = "MODIFIED"
 ADDED = "ADDED"
 DELETED = "DELETED"
@@ -51,7 +55,7 @@ class Node4Config:
     sentence_chars: int = 600
 
     # Gemma generation
-    max_new_tokens: int = 24
+    max_new_tokens: int = 40
 
     # Empty CUDA cache every N Gemma calls
     cleanup_every: int = 10
