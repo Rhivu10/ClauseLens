@@ -118,14 +118,9 @@ class Node4Extractor:
                     s["decided_by"] = "gemma"
 
         counts = Counter(s["label"] for s in sentences if s["label"] != NONE)
-        if counts:
-            top = max(counts.values())
-            primary = min((l for l, n in counts.items() if n == top), key=LABEL_PRIORITY.index)
-        else:
-            primary = NONE
 
         return {
-            "primary_label": primary,
+            "primary_label": primary_label(sentences),
             "labels": sorted(counts, key=LABEL_PRIORITY.index),
             "counts": dict(counts),
             "sentences": sentences,
@@ -142,9 +137,16 @@ class Node4Extractor:
         src_labels = set(src_profile["labels"]) if src_profile else set()
         tgt_labels = set(tgt_profile["labels"]) if tgt_profile else set()
 
+        # Shift is judged on the CHANGED sentences only, so unchanged duties in the
+        # same clause don't hide the real change. Falls back to whole-clause labels
+        # when one side has no changed duty sentence.
+        src_changed, tgt_changed = mark_changed(src_profile, tgt_profile)
         shift = None
-        if src_profile and tgt_profile and src_profile["primary_label"] != tgt_profile["primary_label"]:
-            shift = f"{src_profile['primary_label']} -> {tgt_profile['primary_label']}"
+        if src_profile and tgt_profile:
+            a = src_changed if src_changed != NONE else src_profile["primary_label"]
+            b = tgt_changed if tgt_changed != NONE else tgt_profile["primary_label"]
+            if a != b:
+                shift = f"{a} -> {b}"
 
         labels_added = sorted(tgt_labels - src_labels, key=LABEL_PRIORITY.index)
         labels_removed = sorted(src_labels - tgt_labels, key=LABEL_PRIORITY.index)
@@ -251,6 +253,37 @@ class Node4Extractor:
 # ============================================================
 # HELPERS
 # ============================================================
+
+def primary_label(sentences: list[dict[str, Any]]) -> str:
+    """Most frequent label; ties broken by PROHIBITION > OBLIGATION > PERMISSION."""
+    counts = Counter(s["label"] for s in sentences if s["label"] != NONE)
+    if not counts:
+        return NONE
+    top = max(counts.values())
+    return min((l for l, n in counts.items() if n == top), key=LABEL_PRIORITY.index)
+
+
+def _norm(text: str) -> str:
+    return " ".join(text.lower().split())
+
+
+def mark_changed(src_profile, tgt_profile) -> list[str | None]:
+    """
+    Flag each sentence as changed or not. In a MODIFIED pair a sentence is
+    unchanged if the exact same sentence exists on the other side.
+    Returns the primary label of the CHANGED sentences on each side.
+    """
+    src_texts = {_norm(s["text"]) for s in src_profile["sentences"]} if src_profile else set()
+    tgt_texts = {_norm(s["text"]) for s in tgt_profile["sentences"]} if tgt_profile else set()
+    for p, other in ((src_profile, tgt_texts), (tgt_profile, src_texts)):
+        if p:
+            for s in p["sentences"]:
+                s["changed"] = _norm(s["text"]) not in other
+    return [
+        primary_label([s for s in p["sentences"] if s["changed"]]) if p else None
+        for p in (src_profile, tgt_profile)
+    ]
+
 
 def _pair(status, source_id, target_id, alignment):
     return {

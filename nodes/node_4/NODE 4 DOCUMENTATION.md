@@ -193,6 +193,7 @@ A sentence is **ambiguous** when it has cues for more than one label, or only we
                     "label": "PERMISSION",
                     "ambiguous": False,
                     "decided_by": "regex",     # regex | gemma
+                    "changed": True,           # False if the same sentence is on the other side
                 },
             ],
         },
@@ -202,6 +203,8 @@ A sentence is **ambiguous** when it has cues for more than one label, or only we
 ```
 
 When Gemma overrides a label, the sentence also keeps `"regex_label"` with the original regex answer.
+
+**How `shift` is decided.** In a MODIFIED pair, only the sentences that changed between versions are compared (`"changed": True`). A clause where "may sublicense" became "shall not sublicense" gives `PERMISSION -> PROHIBITION`, even if an unchanged "shall deliver" sentence sits in the same clause. If one side has no changed duty sentence, the whole-clause primary labels are compared instead.
 
 ### `run()` summary
 
