@@ -31,7 +31,7 @@ LABEL_PRIORITY = [PROHIBITION, OBLIGATION, PERMISSION, NONE]
 # ============================================================
 
 # Bump when Node 4 logic changes; checkpoints from older versions are redone
-NODE4_VERSION = "3"
+NODE4_VERSION = "4"
 
 
 MODIFIED = "MODIFIED"

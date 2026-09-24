@@ -143,9 +143,12 @@ def label_sentence(cues: list[dict[str, Any]]) -> tuple[str, bool]:
     """
     Returns (label, ambiguous).
     Ambiguous = cues for several labels, or only weak cues.
+    Strong cues decide the label when present, so a weak "will" can't
+    outrank "shall not be required to" in the same sentence.
     """
     labels = {c["label"] for c in cues}
-    label = min(labels, key=LABEL_PRIORITY.index)
+    deciding = {c["label"] for c in cues if c["strength"] == "strong"} or labels
+    label = min(deciding, key=LABEL_PRIORITY.index)
     ambiguous = len(labels) > 1 or all(c["strength"] == "weak" for c in cues)
     return label, ambiguous
 

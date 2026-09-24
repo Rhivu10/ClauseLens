@@ -141,15 +141,13 @@ class Node4Extractor:
         tgt_labels = set(tgt_profile["labels"]) if tgt_profile else set()
 
         # Shift is judged on the CHANGED sentences only, so unchanged duties in the
-        # same clause don't hide the real change. Falls back to whole-clause labels
-        # when one side has no changed duty sentence.
+        # same clause don't hide the real change. It needs a changed duty sentence
+        # on BOTH sides; a duty that was only added or removed shows up in
+        # labels_added / labels_removed instead.
         src_changed, tgt_changed = mark_changed(src_profile, tgt_profile)
         shift = None
-        if src_profile and tgt_profile:
-            a = src_changed if src_changed != NONE else src_profile["primary_label"]
-            b = tgt_changed if tgt_changed != NONE else tgt_profile["primary_label"]
-            if a != b:
-                shift = f"{a} -> {b}"
+        if src_changed not in (None, NONE) and tgt_changed not in (None, NONE) and src_changed != tgt_changed:
+            shift = f"{src_changed} -> {tgt_changed}"
 
         labels_added = sorted(tgt_labels - src_labels, key=LABEL_PRIORITY.index)
         labels_removed = sorted(src_labels - tgt_labels, key=LABEL_PRIORITY.index)

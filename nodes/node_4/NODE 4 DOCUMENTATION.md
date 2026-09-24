@@ -206,7 +206,9 @@ A sentence is **ambiguous** when it has cues for more than one label, or only we
 
 When Gemma overrides a label, the sentence also keeps `"regex_label"` with the original regex answer. When Gemma's answer is unparseable or picks a label it was not offered, the regex label is kept and the answer is stored in `"gemma_raw"` for debugging.
 
-**How `shift` is decided.** In a MODIFIED pair, only the sentences that changed between versions are compared (`"changed": True`). A clause where "may sublicense" became "shall not sublicense" gives `PERMISSION -> PROHIBITION`, even if an unchanged "shall deliver" sentence sits in the same clause. If one side has no changed duty sentence, the whole-clause primary labels are compared instead.
+**How `shift` is decided.** In a MODIFIED pair, only the sentences that changed between versions are compared (`"changed": True`). A clause where "may sublicense" became "shall not sublicense" gives `PERMISSION -> PROHIBITION`, even if an unchanged "shall deliver" sentence sits in the same clause. A shift needs a changed duty sentence on both sides: when a duty is only added (a new "may suspend" sentence) or only removed, `shift` is `None` and the change shows in `labels_added` / `labels_removed`.
+
+**Strong cues decide.** When a sentence has both strong and weak cues ("shall not be required to ... because Licensor will ..."), only the strong cues decide its label; the sentence is still marked ambiguous so Gemma can check it.
 
 ### `run()` summary
 
