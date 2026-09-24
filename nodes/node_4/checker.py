@@ -41,13 +41,15 @@ def build_deontic_prompt(sentence: str, allowed=VALID_MODEL_LABELS) -> str:
     """Gemma only chooses among the labels the trigger words found, plus NONE."""
     options = [l for l in LABEL_PRIORITY if l in allowed]
     lines = "\n".join(f"{l:11} - {_LABEL_DEFINITIONS[l]}" for l in options)
-    schema = '{"label":"' + "|".join(options) + '"}'
+    # Show a placeholder, not "A|B": Gemma copied "OBLIGATION|NONE" verbatim on Kaggle
     return f"""Classify the legal duty expressed in this contract sentence.
 
+Choose exactly ONE label from this list:
 {lines}
 
-Return ONLY this JSON, no markdown, no extra text:
-{schema}
+Return ONLY this JSON, with <LABEL> replaced by your one chosen label.
+No markdown, no extra text:
+{{"label": "<LABEL>"}}
 
 SENTENCE:
 {sentence}"""
