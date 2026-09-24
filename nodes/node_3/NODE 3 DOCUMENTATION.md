@@ -213,8 +213,9 @@ single-file notebook that Node 3 was packaged from. Current status:
 
 Still unverified:
 
-- **Depends on the patched Node 1.** The last run used the old Node 1 (4,710-char chunks,
-  page footers left in the text). Chunking quality directly affects retrieval scores.
+- **Chunking quality comes from Node 1.** Node 3 uses the current Node 1 in this repo. The last run
+  produced some very long chunks (4,710 chars) and page footers in the text, which lower retrieval
+  scores. Check the Node 1 quality cell in the notebook before trusting Node 3 results.
 - **`similarity_threshold = 0.55`** is a placeholder until calibrated on labeled related and unrelated pairs.
 - **The `MODIFIED` path** has not been exercised. Suggested test: align two identical copies of one
   PDF (all `EQUIVALENT`), then edit amounts, dates and party names in one copy (should be `MODIFIED`).
