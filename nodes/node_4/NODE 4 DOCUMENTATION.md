@@ -152,7 +152,7 @@ A sentence is **ambiguous** when it has cues for more than one label, or only we
 |---|---|---|
 | `model_check` | `"ambiguous"` | `"ambiguous"`: Gemma checks unclear sentences only. `"all"`: every sentence with a cue. `"off"`: regex only |
 | `sentence_chars` | `600` | Character limit of a sentence sent to Gemma |
-| `max_new_tokens` | `24` | Gemma output length |
+| `max_new_tokens` | `40` | Gemma output length |
 | `cleanup_every` | `10` | Empty the CUDA cache every N Gemma calls |
 
 ---
