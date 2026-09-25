@@ -10,6 +10,7 @@ Node 4 currently:
 
 - Reads the Node 3 `align_documents()` report directly (no manual conversion).
 - Keeps only changed pairs: **MODIFIED**, **ADDED** and **DELETED**. EQUIVALENT pairs are skipped.
+- Passes clauses Node 3 could not decide (verdict UNKNOWN) on as **UNVERIFIED** instead of dropping them, so Node 5's critic can check them.
 - Splits each clause into sentences, keeping character offsets into the original chunk text.
 - Finds trigger words with ordered regex rules (shall, must, may, shall not, prohibited, entitled to...).
 - Ignores definitions such as "shall mean" and "shall be deemed".
@@ -164,7 +165,7 @@ A sentence is **ambiguous** when it has cues for more than one label, or only we
 ```python
 {
     "pair_id": "MODIFIED:document_a_0007->document_b_0009",
-    "change_status": "MODIFIED",               # MODIFIED | ADDED | DELETED
+    "change_status": "MODIFIED",               # MODIFIED | ADDED | DELETED | UNVERIFIED
     "source_chunk_id": "document_a_0007",      # None for ADDED
     "target_chunk_id": "document_b_0009",      # None for DELETED
     "alignment": {                             # from Node 3
@@ -218,7 +219,7 @@ When Gemma overrides a label, the sentence also keeps `"regex_label"` with the o
     "counts": {"MODIFIED": 4, "DELETED": 25, "ADDED": 31},
     "label_counts": {"OBLIGATION": 30, "PERMISSION": 12, "NONE": 18},
     "deontic_changes": ["MODIFIED:...", ...],  # pair_ids with has_deontic_change
-    "skipped": {"EQUIVALENT": 1},              # Node 3 verdicts not sent on
+    "skipped": {"EQUIVALENT": 1},              # Node 3 verdicts not sent on (EQUIVALENT only)
 }
 ```
 

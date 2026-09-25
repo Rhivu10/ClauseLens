@@ -34,6 +34,7 @@ from .config import (
     MODIFIED,
     ADDED,
     DELETED,
+    UNVERIFIED,
 )
 from .patterns import tag_text
 
@@ -73,11 +74,22 @@ class Node4Extractor:
         Turn a Node 3 align_documents() report into changed pairs.
 
         MODIFIED : source chunk + matched target chunk
-        DELETED  : source chunk with NO_MATCH (Node 3 "removed")
-        ADDED    : target chunk never matched (Node 3 "added")
+        DELETED    : source chunk with NO_MATCH (Node 3 "removed")
+        ADDED      : target chunk never matched (Node 3 "added")
+        UNVERIFIED : source chunk Node 3 could not decide (verdict UNKNOWN)
         """
         pairs = []
         for r in report["results"]:
+            if r["verdict"] == "UNKNOWN":
+                best = r["matches"][0] if r["matches"] else {}
+                pairs.append(_pair(UNVERIFIED, r["source_chunk_id"], None, {
+                    "node3_status": r["status"],
+                    "best_score": r["best_score"],
+                    "best_candidate_chunk_id": best.get("candidate_chunk_id"),
+                    "decided_by": best.get("decided_by"),
+                    "gemma_raw": str(best.get("result", {}).get("raw", ""))[:200],
+                }))
+                continue
             if r["verdict"] == MODIFIED:
                 match = next(m for m in r["matches"] if m["candidate_chunk_id"] == r["matched_chunk_id"])
                 pairs.append(_pair(MODIFIED, r["source_chunk_id"], r["matched_chunk_id"], {
@@ -230,7 +242,7 @@ class Node4Extractor:
                 print(f"[{i}/{total}] elapsed {elapsed:.0f}s | eta {eta:.0f}s")
 
         skipped = Counter(r["verdict"] for r in report["results"]
-                          if r["verdict"] not in (MODIFIED, "NO_MATCH"))
+                          if r["verdict"] not in (MODIFIED, "NO_MATCH", "UNKNOWN"))
         return {
             "pairs": pairs,
             "counts": dict(Counter(p["change_status"] for p in pairs)),

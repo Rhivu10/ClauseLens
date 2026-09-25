@@ -31,12 +31,15 @@ LABEL_PRIORITY = [PROHIBITION, OBLIGATION, PERMISSION, NONE]
 # ============================================================
 
 # Bump when Node 4 logic changes; checkpoints from older versions are redone
-NODE4_VERSION = "4"
+NODE4_VERSION = "5"
 
 
 MODIFIED = "MODIFIED"
 ADDED = "ADDED"
 DELETED = "DELETED"
+# Node 3 could not decide (verdict UNKNOWN). Passed on, not dropped, so
+# Node 5's critic can check it.
+UNVERIFIED = "UNVERIFIED"
 
 
 # ============================================================
