@@ -32,6 +32,10 @@ class Node3Config:
     # TENTATIVE — calibrate with Node3Aligner.best_scores()
     similarity_threshold: float = 0.55
 
+    # At or above this score (or with the same heading) two chunks are treated
+    # as the same clause: Gemma may answer EQUIVALENT or MODIFIED, not NO_MATCH
+    structural_score: float = 0.80
+
     # SAME character limit for source and target text
     text_chars: int = 1200
 

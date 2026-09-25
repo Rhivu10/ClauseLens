@@ -57,6 +57,8 @@ def parse_verdict(raw: str) -> dict[str, Any]:
             verdict = str(d.get("alignment_result", "")).strip().upper()
             if verdict in VALID_VERDICTS:
                 change_type = str(d.get("change_type", "") or "").strip()
+                if change_type.upper() == "<CHANGE>":
+                    change_type = ""     # placeholder echoed from the prompt
                 if verdict != "MODIFIED":
                     change_type = ""     # NO_MATCH/EQUIVALENT cannot have a change type
                 return {"alignment_result": verdict, "change_type": change_type}

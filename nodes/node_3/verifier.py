@@ -52,15 +52,33 @@ def load_gemma_with_adapter(
 # PROMPT
 # ============================================================
 
-def build_compact_prompt(source_text: str, candidate_text: str) -> str:
+def build_compact_prompt(source_text: str, candidate_text: str, allow_no_match: bool = True) -> str:
+    """
+    allow_no_match=False is used when the aligner already knows both clauses are
+    the same clause (very high similarity or same heading): Gemma then only
+    decides EQUIVALENT vs MODIFIED.
+    """
+    if allow_no_match:
+        options = """EQUIVALENT - same subject, same meaning
+MODIFIED   - same subject, but something changed
+NO_MATCH   - the clauses cover different subjects"""
+    else:
+        options = """These are the same clause taken from two versions of one contract.
+EQUIVALENT - the meaning is unchanged
+MODIFIED   - something changed"""
     return f"""Compare SOURCE and TARGET legal clauses.
 
-Differences in parties, dates, amounts, rights, or conditions count as
-material differences. Use NO_MATCH only if the clauses cover different subjects.
-Do not invent facts not present in the text.
+{options}
 
-Return ONLY this JSON, no markdown, no extra text:
-{{"alignment_result":"EQUIVALENT|MODIFIED|NO_MATCH","change_type":"short label, or empty"}}
+Differences in parties, dates, amounts, rights, or conditions count as
+material differences. A reversed or changed duty is MODIFIED, not NO_MATCH:
+for example "may" becoming "shall not", or "is required to" becoming
+"is not required to". Do not invent facts not present in the text.
+
+Return ONLY this JSON, with <RESULT> replaced by your one chosen answer
+and <CHANGE> by a short label of what changed (empty if nothing changed).
+No markdown, no extra text:
+{{"alignment_result": "<RESULT>", "change_type": "<CHANGE>"}}
 
 SOURCE:
 {source_text}
@@ -92,23 +110,23 @@ class GemmaVerifier:
             return_dict=True,
         )
 
-    def build_inputs(self, source_text: str, candidate_text: str):
+    def build_inputs(self, source_text: str, candidate_text: str, allow_no_match: bool = True):
         """Shrink both sides equally until the prompt fits the token budget."""
         limit = self.config.text_chars
         for _ in range(5):
             s, t = source_text[:limit], candidate_text[:limit]
-            inputs = self._encode(build_compact_prompt(s, t))
+            inputs = self._encode(build_compact_prompt(s, t, allow_no_match))
             if inputs["input_ids"].shape[-1] <= self.config.max_input_tokens:
                 break
             limit = int(limit * 0.75)
         truncated = len(source_text) > limit or len(candidate_text) > limit
         return inputs, truncated
 
-    def compare_clauses(self, source_text: str, candidate_text: str):
+    def compare_clauses(self, source_text: str, candidate_text: str, allow_no_match: bool = True):
         """Returns (raw_response, truncated). Cleanup always runs (try/finally)."""
         inputs = outputs = None
         try:
-            inputs, truncated = self.build_inputs(source_text, candidate_text)
+            inputs, truncated = self.build_inputs(source_text, candidate_text, allow_no_match)
             inputs = {k: v.to(self.model.device) for k, v in inputs.items()}
             with torch.no_grad():
                 outputs = self.model.generate(

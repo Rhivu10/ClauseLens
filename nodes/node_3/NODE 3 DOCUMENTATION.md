@@ -11,6 +11,7 @@ Node 3 currently:
 - Retrieves target-document candidates from the Node 2 FAISS index.
 - Applies a similarity gate, so clearly unrelated clauses never reach the model.
 - Skips the model when both texts are identical (`exact_text`).
+- Treats clearly identical clauses (score ≥ `structural_score`, or the same heading) as a **structural match**: Gemma may then only answer EQUIVALENT or MODIFIED, never NO_MATCH.
 - Verifies remaining pairs with **Gemma 4 E2B fine-tuned on CUAD** (LoRA adapter).
 - Parses Gemma's JSON output tolerantly (code fences, extra prose, bad JSON → `UNKNOWN`).
 - Runs a deterministic **numeric diff** (amounts, dates, counts) on the full text as an extra flag.
@@ -39,6 +40,11 @@ Node 3 does **not** extract PDFs or build indexes. Those are Node 1 and Node 2.
                        |
                        v
                exact-text check ---- identical ---------->  EQUIVALENT
+                       |
+                       v
+               structural match? (score >= 0.80 or same heading)
+                 yes: Gemma answers EQUIVALENT | MODIFIED only
+                 no : Gemma answers EQUIVALENT | MODIFIED | NO_MATCH
                        |
                        v
               +------------------+
@@ -127,6 +133,7 @@ print(report["counts"], report["removed"], report["added"])
 |---|---|---|
 | `candidate_k` | `3` | Target candidates verified per source chunk |
 | `similarity_threshold` | `0.55` | Minimum cosine score to call Gemma. **Tentative — calibrate** |
+| `structural_score` | `0.80` | At or above this score (or with the same heading) the pair is a structural match and cannot be NO_MATCH |
 | `text_chars` | `1200` | Character limit per side (same for source and target) |
 | `max_seq_length` | `1024` | Must match the value the model was loaded with |
 | `max_new_tokens` | `80` | Gemma output length |
@@ -153,8 +160,10 @@ print(report["counts"], report["removed"], report["added"])
             "similarity_score": 0.7123,
             "numeric_diff": {"only_in_source": ["$5,000"], "only_in_target": ["$7,500"]},
             "result": {"alignment_result": "MODIFIED", "change_type": "payment amount"},
-            "decided_by": "gemma",   # gemma | exact_text | error
+            "decided_by": "gemma",   # gemma | exact_text | structure | error
             "truncated": False,
+            "structural_match": "score",   # "score" | "heading" | None
+            # "gemma_verdict": "NO_MATCH"  # only when decided_by == "structure"
         },
     ],
 }
@@ -196,6 +205,36 @@ print(np.round(np.percentile(vals, [0, 10, 25, 50, 75, 90, 100]), 3))
 Pick a value between the scores of known-unrelated and known-related clauses, then set
 `config.similarity_threshold`. The lowest-scoring chunk should come back as
 `BELOW_THRESHOLD` from `align_source_clause`.
+
+---
+
+## Structural Match
+
+On the test contract (two versions of one agreement), Gemma answered **NO_MATCH** for clauses
+that were obviously the same clause with a reversed duty:
+
+| Clause | Score | Gemma |
+|---|---|---|
+| 2.1 Grant of License ("may sublicense" → "shall not sublicense") | 0.99 | NO_MATCH |
+| 6.1 Data Backups ("is required to" → "shall not be required to") | 0.90 | NO_MATCH |
+| 4.2 Updates ("may provide" → "shall provide") | 0.80 | NO_MATCH |
+
+These were then reported as DELETED + ADDED, so Node 4 never saw the duty shift.
+
+Now, when the best candidate scores at least `structural_score` (0.80) **or** has the same
+heading as the source (e.g. both are "2.1 Grant of License"):
+
+1. Gemma gets a prompt without the NO_MATCH option and only decides EQUIVALENT vs MODIFIED.
+2. If Gemma still answers NO_MATCH (or its answer is unparseable), the verdict becomes
+   **MODIFIED** with `decided_by: "structure"` and Gemma's answer kept in `gemma_verdict`.
+   The exact-text check has already ruled out identical text, so the clause did change.
+
+Pairs below 0.80 with different headings are unchanged: Gemma can still answer NO_MATCH
+(e.g. 7.1 Employees vs 8.2 Termination at 0.55 stays NO_MATCH).
+
+The prompt also states that a reversed or changed duty is MODIFIED, not NO_MATCH, and asks for
+the answer with `<RESULT>` / `<CHANGE>` placeholders instead of listing `A|B|C`, which Gemma
+tended to copy verbatim in Node 4.
 
 ---
 

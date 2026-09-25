@@ -10,6 +10,10 @@ For each source chunk:
           |
           +----> exact-text check --(same)--->  EQUIVALENT
           |
+          +----> structural match? (score >= structural_score, or same heading)
+          |          yes: Gemma decides EQUIVALENT | MODIFIED only
+          |          no : Gemma decides EQUIVALENT | MODIFIED | NO_MATCH
+          |
           +----> Gemma verifier  ------------>  EQUIVALENT | MODIFIED | NO_MATCH
 
 Document level: unmatched source chunks are REMOVED,
@@ -103,6 +107,24 @@ class Node3Aligner:
         threshold = self.config.similarity_threshold if threshold is None else threshold
         return candidate["score"] >= threshold
 
+    def structural_match(
+        self,
+        source_chunk: dict[str, Any],
+        cand_chunk: dict[str, Any],
+        score: float,
+    ) -> str | None:
+        """
+        Returns "score" or "heading" when the two chunks are clearly the same
+        clause, else None. A structural match can't be NO_MATCH: on Kaggle,
+        Gemma answered NO_MATCH for clauses scoring 0.99 whose duty was reversed.
+        """
+        if score >= self.config.structural_score:
+            return "score"
+        hs, ht = _heading(source_chunk), _heading(cand_chunk)
+        if hs and hs == ht:
+            return "heading"
+        return None
+
     # ============================================================
     # PAIR COMPARISON
     # ============================================================
@@ -113,11 +135,13 @@ class Node3Aligner:
         s = normalize_text(source_chunk["text"])
         t = normalize_text(cand_chunk["text"])
         diff = numeric_diff(s, t)
+        structural = self.structural_match(source_chunk, cand_chunk, float(candidate["score"]))
 
         entry = {
             "candidate_chunk_id": candidate["chunk_id"],
             "similarity_score": round(float(candidate["score"]), 4),
             "numeric_diff": diff,
+            "structural_match": structural,
         }
 
         # Deterministic shortcut: identical text needs no model call
@@ -130,9 +154,15 @@ class Node3Aligner:
             return entry
 
         try:
-            raw, truncated = self.verifier.compare_clauses(s, t)
-            entry["result"] = parse_verdict(raw)
+            raw, truncated = self.verifier.compare_clauses(s, t, allow_no_match=structural is None)
+            result = parse_verdict(raw)
             entry["decided_by"] = "gemma"
+            if structural and result["alignment_result"] in ("NO_MATCH", "UNKNOWN"):
+                # Same clause but the text differs: MODIFIED, whatever Gemma said
+                entry["gemma_verdict"] = result["alignment_result"]
+                result = {"alignment_result": "MODIFIED", "change_type": result.get("change_type", "")}
+                entry["decided_by"] = "structure"
+            entry["result"] = result
             entry["truncated"] = truncated
         except torch.cuda.OutOfMemoryError:
             gc.collect()
@@ -250,6 +280,12 @@ class Node3Aligner:
         return rows
 
 
+def _heading(chunk: dict[str, Any]) -> str:
+    """Last heading of a chunk, normalized ("2.1 Grant of License" -> "2.1 grant of license")."""
+    path = chunk.get("heading_path") or []
+    return " ".join(str(path[-1]).lower().split()) if path else ""
+
+
 # ============================================================
 # DISPLAY
 # ============================================================
@@ -265,6 +301,9 @@ def show(result: dict[str, Any], source_chunk: dict[str, Any] | None = None) -> 
           "| matched:", result["matched_chunk_id"])
     for m in result["matches"]:
         print("  ->", m["candidate_chunk_id"], "| score", m["similarity_score"],
-              "|", m["result"], "| by", m["decided_by"], "| truncated:", m["truncated"])
+              "|", m["result"], "| by", m["decided_by"], "| truncated:", m["truncated"],
+              "| structural:", m.get("structural_match"))
+        if "gemma_verdict" in m:
+            print("     Gemma said", m["gemma_verdict"], "— overridden: same clause, text differs")
         if m["numeric_diff"]["only_in_source"] or m["numeric_diff"]["only_in_target"]:
             print("     numeric_diff:", m["numeric_diff"])
