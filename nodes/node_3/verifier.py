@@ -87,6 +87,21 @@ TARGET:
 {candidate_text}"""
 
 
+def build_one_word_prompt(source_text: str, candidate_text: str, allow_no_match: bool = True) -> str:
+    """Retry prompt: the question comes last, so the first word Gemma writes is the answer."""
+    options = "EQUIVALENT - same meaning\nMODIFIED - same subject, something changed"
+    if allow_no_match:
+        options += "\nNO_MATCH - different subjects"
+    return f"""SOURCE clause:
+{source_text}
+
+TARGET clause:
+{candidate_text}
+
+Compare the two clauses. Reply with exactly ONE word:
+{options}"""
+
+
 # ============================================================
 # VERIFIER
 # ============================================================
@@ -110,12 +125,19 @@ class GemmaVerifier:
             return_dict=True,
         )
 
-    def build_inputs(self, source_text: str, candidate_text: str, allow_no_match: bool = True):
+    def build_inputs(
+        self,
+        source_text: str,
+        candidate_text: str,
+        allow_no_match: bool = True,
+        prompt_builder=None,
+    ):
         """Shrink both sides equally until the prompt fits the token budget."""
+        prompt_builder = prompt_builder or build_compact_prompt
         limit = self.config.text_chars
         for _ in range(5):
             s, t = source_text[:limit], candidate_text[:limit]
-            inputs = self._encode(build_compact_prompt(s, t, allow_no_match))
+            inputs = self._encode(prompt_builder(s, t, allow_no_match))
             if inputs["input_ids"].shape[-1] <= self.config.max_input_tokens:
                 break
             limit = int(limit * 0.75)
@@ -124,16 +146,25 @@ class GemmaVerifier:
 
     def compare_clauses(self, source_text: str, candidate_text: str, allow_no_match: bool = True):
         """Returns (raw_response, truncated). Cleanup always runs (try/finally)."""
+        return self._run(source_text, candidate_text, allow_no_match, build_compact_prompt,
+                         max_new_tokens=self.config.max_new_tokens)
+
+    def retry_clauses(self, source_text: str, candidate_text: str, allow_no_match: bool = True):
+        """
+        Second attempt when the first answer was unreadable. One-word prompt,
+        few tokens and a repetition penalty: on Kaggle, Gemma once looped
+        ('"1.1 . . . . .') until it ran out of tokens.
+        """
+        return self._run(source_text, candidate_text, allow_no_match, build_one_word_prompt,
+                         max_new_tokens=8, repetition_penalty=1.3)
+
+    def _run(self, source_text, candidate_text, allow_no_match, prompt_builder, **generate_kwargs):
         inputs = outputs = None
         try:
-            inputs, truncated = self.build_inputs(source_text, candidate_text, allow_no_match)
+            inputs, truncated = self.build_inputs(source_text, candidate_text, allow_no_match, prompt_builder)
             inputs = {k: v.to(self.model.device) for k, v in inputs.items()}
             with torch.no_grad():
-                outputs = self.model.generate(
-                    **inputs,
-                    max_new_tokens=self.config.max_new_tokens,
-                    do_sample=False,
-                )
+                outputs = self.model.generate(**inputs, do_sample=False, **generate_kwargs)
             generated = outputs[0][inputs["input_ids"].shape[-1]:]
             response = self.tokenizer.decode(generated, skip_special_tokens=True).strip()
             return response, truncated

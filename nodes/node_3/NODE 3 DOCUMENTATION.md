@@ -13,7 +13,8 @@ Node 3 currently:
 - Skips the model when both texts are identical (`exact_text`).
 - Treats clearly identical clauses (score ≥ `structural_score`, or the same heading) as a **structural match**: Gemma may then only answer EQUIVALENT or MODIFIED, never NO_MATCH.
 - Verifies remaining pairs with **Gemma 4 E2B fine-tuned on CUAD** (LoRA adapter).
-- Parses Gemma's JSON output tolerantly (code fences, extra prose, bad JSON → `UNKNOWN`).
+- Parses Gemma's JSON output tolerantly (code fences, extra prose, a bare verdict word; bad output → `UNKNOWN`).
+- Retries once with a short one-word prompt when Gemma's answer is unreadable (`decided_by: "gemma_retry"`, first answer kept in `first_raw`). On Kaggle, Gemma once looped (`"1.1 . . . . .`) until it ran out of tokens.
 - Runs a deterministic **numeric diff** (amounts, dates, counts) on the full text as an extra flag.
 - Shrinks long prompts evenly on both sides to fit the token budget and flags them as `truncated`.
 - Recovers from CUDA out-of-memory errors (`UNKNOWN`, `decided_by: "error"`).
@@ -160,7 +161,7 @@ print(report["counts"], report["removed"], report["added"])
             "similarity_score": 0.7123,
             "numeric_diff": {"only_in_source": ["$5,000"], "only_in_target": ["$7,500"]},
             "result": {"alignment_result": "MODIFIED", "change_type": "payment amount"},
-            "decided_by": "gemma",   # gemma | exact_text | structure | error
+            "decided_by": "gemma",   # gemma | gemma_retry | exact_text | structure | error
             "truncated": False,
             "structural_match": "score",   # "score" | "heading" | None
             # "gemma_verdict": "NO_MATCH"  # only when decided_by == "structure"

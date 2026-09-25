@@ -35,6 +35,7 @@ from .helpers import (
 from .verifier import (
     load_gemma_with_adapter,
     build_compact_prompt,
+    build_one_word_prompt,
     GemmaVerifier,
 )
 
@@ -68,6 +69,7 @@ __all__ = [
     # Gemma verifier
     "load_gemma_with_adapter",
     "build_compact_prompt",
+    "build_one_word_prompt",
     "GemmaVerifier",
 
     # Alignment

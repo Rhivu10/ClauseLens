@@ -157,6 +157,12 @@ class Node3Aligner:
             raw, truncated = self.verifier.compare_clauses(s, t, allow_no_match=structural is None)
             result = parse_verdict(raw)
             entry["decided_by"] = "gemma"
+            if result["alignment_result"] == "UNKNOWN" and not structural:
+                # Unreadable answer: one retry with a one-word prompt
+                entry["first_raw"] = raw[:200]
+                raw, truncated = self.verifier.retry_clauses(s, t, allow_no_match=True)
+                result = parse_verdict(raw)
+                entry["decided_by"] = "gemma_retry"
             if structural and result["alignment_result"] in ("NO_MATCH", "UNKNOWN"):
                 # Same clause but the text differs: MODIFIED, whatever Gemma said
                 entry["gemma_verdict"] = result["alignment_result"]

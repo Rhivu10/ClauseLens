@@ -64,4 +64,11 @@ def parse_verdict(raw: str) -> dict[str, Any]:
                 return {"alignment_result": verdict, "change_type": change_type}
         except json.JSONDecodeError:
             pass
+
+    # Fallback: a bare verdict word ("MODIFIED", "No match", ...). Only accepted
+    # when exactly one verdict appears, so an echoed option list stays UNKNOWN.
+    words = set(re.findall(r"[A-Z_]+", raw.upper().replace("NO MATCH", "NO_MATCH")))
+    found = words & VALID_VERDICTS
+    if len(found) == 1:
+        return {"alignment_result": found.pop(), "change_type": ""}
     return {"alignment_result": "UNKNOWN", "change_type": "", "raw": raw}
