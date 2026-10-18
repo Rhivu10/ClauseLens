@@ -116,13 +116,18 @@ def parse_impact(raw: str) -> dict[str, Any]:
         for m in matches:
             affected += [a.strip(" .*-") for a in re.split(r"[;,]|\band\b", m.group(1)) if a.strip(" .*-")]
         text = text[:matches[0].start()].strip()
-    text = re.sub(r"^\s*(?:summary|impact)\s*:\s*", "", text, flags=re.I)
+    # Prompt echoes seen on a real contract: "Here is the revised explanation based
+    # strictly on your constraints: ..."
+    text = re.sub(r"^\s*(?:here\s+is|here's)\b[^:\n]{0,80}:\s*", "", text, flags=re.I)
+    text = re.sub(r"^\s*(?:revised\s+)?(?:summary|impact|explanation)\s*:\s*", "", text, flags=re.I)
     summary = " ".join(text.split())
 
     seen, clean = set(), []
     for a in affected:
         key = a.lower()
-        if key in ("party one", "party two", "<party>") or _NOBODY_RE.search(a) or key in seen:
+        # placeholders like "party one", "<party>", "[Other Party]" (seen on a real contract)
+        is_placeholder = key in ("party one", "party two") or re.fullmatch(r"[\[<{].*[\]>}]", a.strip())
+        if is_placeholder or _NOBODY_RE.search(a) or key in seen:
             continue                                  # placeholder, nobody, or duplicate
         seen.add(key)
         clean.append(a)
@@ -146,8 +151,9 @@ def build_critic_prompt(
     if double_check:
         words = ("\n\nThese words in the SUMMARY do not appear in the contract text: "
                  + ", ".join(double_check[:8])
-                 + ".\nIf any of them adds a fact the text does not state, answer HALLUCINATION. "
-                   "If they only rephrase the text, they are fine.")
+                 + ".\nOnly answer HALLUCINATION if one of them states a FACT the text does not support "
+                   "(a party, amount, date, right or duty). Words that only describe or rephrase the change "
+                   "are fine.")
     return f"""You are a strict reviewer of contract summaries.
 
 FACT (already verified): CHANGE: {_STATUS_TEXT.get(view['status'], view['status'])}
@@ -158,6 +164,9 @@ SUMMARY TO CHECK:
 {summary}{words}
 
 Check every claim in the SUMMARY against the contract text above.
+Judge the FACTS (parties, amounts, dates, rights, duties, what was added or removed),
+not the wording: plain-English paraphrase such as "updated", "replaced", "now says"
+or "the new wording" is fine as long as the facts are right.
 Reply with ONE word on the first line:
 VERIFIED - every claim in the summary is supported by the text
 HALLUCINATION - the summary says something the text does not say

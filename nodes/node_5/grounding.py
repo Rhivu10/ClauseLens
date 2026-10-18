@@ -44,6 +44,10 @@ old older wording worded words duty duties completely entirely fully another any
 side sides whatever whenever thereby therefore although
 one two three four five six seven eight nine ten eleven twelve fifteen twenty thirty forty fifty
 sixty seventy eighty ninety hundred thousand million percent
+said says sentence sentences language phrase phrases additions additionally furthermore moreover
+finally clarify clarifies clarified describe describes described mention mentions mentioned refer
+refers referenced item items part parts point points rule rules scope just rather found remain
+remains stays compared comparison difference differences listed details detailed
 """.split())
 
 

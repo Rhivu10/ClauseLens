@@ -32,7 +32,7 @@ STATUS_SKIPPED = "SKIPPED"                # too little text to analyse (e.g. a h
 
 
 # Bump when Node 5 logic or prompts change; checkpoints from older versions are redone
-NODE5_VERSION = "5"
+NODE5_VERSION = "6"
 
 
 # ============================================================

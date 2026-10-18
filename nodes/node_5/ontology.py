@@ -110,13 +110,14 @@ def party_is_grounded(party: str, text: str, allowed: list[str]) -> bool:
     generic = {"both parties", "either party", "each party", "the parties", "parties", "neither party"}
     if p in generic:
         return True
-    forms = {p, _singular(p)}
+    # "Licensor/provider" (no spaces) and "Licensor / provider" both split into their parts
+    split = lambda s: [x.strip() for x in [s] + re.split(r"\s*/\s*", s) if x.strip()]
+    forms = {f for piece in split(p) for f in (piece, _singular(piece))}
     # Allowed names and their singular forms: "Licensee / buyer" -> licensee, buyer.
     # (Kaggle run 3: "all licensees" was rejected against the allowed "Licensee".)
     allowed_forms = set()
     for a in allowed:
-        for piece in [a.lower()] + a.lower().split(" / "):
-            piece = piece.strip()
+        for piece in split(a.lower()):
             allowed_forms |= {piece, _singular(piece)}
     if forms & allowed_forms:
         return True

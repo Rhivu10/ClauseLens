@@ -23,6 +23,19 @@ def normalize_text(text: str) -> str:
     return re.sub(r"\s+", " ", text).strip()
 
 
+_FORMAT_CHARS = re.compile(r"[\s\-‐‑–—_™®©*\"'“”‘’]+")
+
+
+def formatting_key(text: str) -> str:
+    """
+    Text with formatting removed: case, all spaces, hyphens/dashes, ™ ® ©,
+    asterisks and quote styles. Two clauses with the same key differ only in
+    formatting ("License Fees" / "LicenseFees", "re-examinations" /
+    "reexaminations", Symphony™ / Symphony®), seen on a real EDGAR pair.
+    """
+    return _FORMAT_CHARS.sub("", text.lower())
+
+
 # ============================================================
 # NUMERIC DIFF
 # ============================================================

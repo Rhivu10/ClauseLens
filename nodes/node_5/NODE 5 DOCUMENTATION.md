@@ -352,6 +352,28 @@ cell after a crash reads finished pairs from disk. A checkpoint from other input
 Since run 2, **no wrong summary has been marked VERIFIED**. The remaining weakness is the Impact Agent's writing
 quality, hence the E4B option above.
 
+## Real contract (SEC EDGAR pair)
+
+First run on a real before/after pair (Echo Therapeutics – Ferndale License Agreement 2009 vs its 2012 Amended and
+Restated version). The important legal changes were found and explained correctly (Territory expanded to Europe,
+Australia, South America; right of first refusal → right of first negotiation; new Minimum Annual Royalty; patent
+abandonment now needs consultation instead of consent; new insurance-certificate duty). Fixes made after that run:
+
+| Seen on the real pair | Fix |
+|---|---|
+| Correct summaries rejected for describing words ("said", "sentence", "additions", "language") | those words are always allowed in the word check |
+| Critic rejected correct summaries for wording ("'updated' is interpretive") | the Critic is told to judge facts, not wording, including for the double-check words |
+| `[Other Party]` placeholder as an affected party | placeholders in brackets are dropped |
+| "Here is the revised explanation based strictly on your constraints: …" | prompt echoes are stripped from the start of a summary |
+| "Licensor/provider" rejected (hint is "Licensor / provider") | slash with or without spaces |
+
+Also related: Node 3's formatting-only check (see its docs) and the clean-up step in the real-contract test
+notebook (between Node 1 and Node 2; Node 1 itself is unchanged). Together they remove most of the noise pairs
+(spacing, ™/®, table headings, sections 11–27 lumped together) before Node 5.
+
+Known PDF limitation: the 2009 PDF's text layer turns "1½%" into "11/2%", so a summary claimed the late fee
+"increased from 11/2% to 1½%". Neither the rules nor the Critic can know the two are the same.
+
 ## Known Limitations
 
 - **Tested on one fictional contract.** Three Kaggle runs on the same test contract; prompts and the word check were

@@ -22,6 +22,7 @@ from .config import (
 
 from .helpers import (
     normalize_text,
+    formatting_key,
     extract_numbers,
     numeric_diff,
     parse_verdict,
@@ -62,6 +63,7 @@ __all__ = [
 
     # Helpers
     "normalize_text",
+    "formatting_key",
     "extract_numbers",
     "numeric_diff",
     "parse_verdict",

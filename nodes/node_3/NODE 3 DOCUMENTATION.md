@@ -11,6 +11,7 @@ Node 3 currently:
 - Retrieves target-document candidates from the Node 2 FAISS index.
 - Applies a similarity gate, so clearly unrelated clauses never reach the model.
 - Skips the model when both texts are identical (`exact_text`).
+- Also skips it when the texts differ only in formatting: spaces, hyphens, ™/®/©, asterisks, quote styles (`format_only`, verdict EQUIVALENT). On a real EDGAR pair this covered "License Fees" vs "LicenseFees", "re-examinations" vs "reexaminations" and Symphony™ vs Symphony®, and raised the clauses matched without Gemma from 44 to 65 of 127.
 - Treats clearly identical clauses (score ≥ `structural_score`, or the same heading) as a **structural match**: Gemma may then only answer EQUIVALENT or MODIFIED, never NO_MATCH.
 - Verifies remaining pairs with **Gemma 4 E2B fine-tuned on CUAD** (LoRA adapter).
 - Parses Gemma's JSON output tolerantly (code fences, extra prose, a bare verdict word; bad output → `UNKNOWN`).
@@ -161,7 +162,7 @@ print(report["counts"], report["removed"], report["added"])
             "similarity_score": 0.7123,
             "numeric_diff": {"only_in_source": ["$5,000"], "only_in_target": ["$7,500"]},
             "result": {"alignment_result": "MODIFIED", "change_type": "payment amount"},
-            "decided_by": "gemma",   # gemma | gemma_retry | exact_text | structure | error
+            "decided_by": "gemma",   # gemma | gemma_retry | exact_text | format_only | structure | error
             "truncated": False,
             "structural_match": "score",   # "score" | "heading" | None
             # "gemma_verdict": "NO_MATCH"  # only when decided_by == "structure"

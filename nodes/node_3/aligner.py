@@ -31,7 +31,7 @@ import torch
 from nodes.node_2 import semantic_search
 
 from .config import Node3Config, VERDICT_PRIORITY
-from .helpers import normalize_text, numeric_diff, parse_verdict
+from .helpers import formatting_key, normalize_text, numeric_diff, parse_verdict
 from .verifier import GemmaVerifier
 
 
@@ -144,11 +144,12 @@ class Node3Aligner:
             "structural_match": structural,
         }
 
-        # Deterministic shortcut: identical text needs no model call
-        if s.lower() == t.lower():
+        # Deterministic shortcuts: identical text, or text that differs only in
+        # formatting (spaces, hyphens, ™/®, quote styles), needs no model call
+        if s.lower() == t.lower() or formatting_key(s) == formatting_key(t):
             entry.update({
                 "result": {"alignment_result": "EQUIVALENT", "change_type": ""},
-                "decided_by": "exact_text",
+                "decided_by": "exact_text" if s.lower() == t.lower() else "format_only",
                 "truncated": False,
             })
             return entry
