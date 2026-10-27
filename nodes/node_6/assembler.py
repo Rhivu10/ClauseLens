@@ -79,6 +79,7 @@ class ReportAssembler:
 
         self._position: dict[str, tuple[str, float]] = {}
         self.chunk_counts: Counter = Counter()
+        self.page_counts: dict[str, int] = {}
         self.contract_parties: list[str] = []
         if all_chunks:
             by_doc: dict[str, list[dict]] = defaultdict(list)
@@ -86,6 +87,10 @@ class ReportAssembler:
                 by_doc[c["document_id"]].append(c)
             for doc, chunks in by_doc.items():
                 self.chunk_counts[doc] = len(chunks)
+                pages = [c.get("page_end") or c.get("page_start") for c in chunks]
+                pages = [p for p in pages if isinstance(p, int)]
+                if pages:
+                    self.page_counts[doc] = max(pages)
                 for i, c in enumerate(chunks):
                     self._position[c["chunk_id"]] = (doc, i / max(1, len(chunks)))
             # The contract's parties: named in each document's opening chunk
@@ -172,6 +177,7 @@ class ReportAssembler:
                 "labels_removed": d.get("labels_removed", []),
             },
             "numbers": al.get("numeric_diff") or {},
+            "similarity": al.get("similarity_score"),          # Node 3 score; None for ADDED/DELETED
             "categories": im.get("categories", []),
             "attempts": im.get("attempts"),
             "evidence": evidence,
@@ -187,6 +193,7 @@ class ReportAssembler:
             out[doc] = {
                 "name": self.documents.get(doc, "Previous version" if doc == "document_a" else "New version"),
                 "chunks": self.chunk_counts.get(doc),
+                "pages": self.page_counts.get(doc),
             }
         return out
 

@@ -45,6 +45,18 @@ from .export import (
 
 
 # ============================================================
+# UI (clauselens-ui)
+# ============================================================
+
+from .ui import (
+    UI_STATUS,
+    to_ui_data,
+    save_ui_data,
+    save_ui_module,
+)
+
+
+# ============================================================
 # PUBLIC API
 # ============================================================
 
@@ -65,4 +77,10 @@ __all__ = [
     "load_report",
     "to_markdown",
     "save_markdown",
+
+    # UI (clauselens-ui)
+    "UI_STATUS",
+    "to_ui_data",
+    "save_ui_data",
+    "save_ui_module",
 ]
