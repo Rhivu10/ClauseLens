@@ -46,8 +46,9 @@ def normalize_party(name: str) -> str | None:
     if n.lower().strip(".") in _FRAGMENTS:
         return None
     words = n.split()
-    words[-1] = _singular(words[-1])                     # "Licensees" -> "Licensee"
-    n = " ".join(words)
+    if len(words) == 1:
+        n = _singular(n)                                 # "Licensees" -> "Licensee"
+    # Multi-word names are company names: "Echo Therapeutics" stays as it is
     # Title-case lowercase names ("licensor" -> "Licensor"); keep names already capitalised
     return n[:1].upper() + n[1:] if n.islower() else n
 

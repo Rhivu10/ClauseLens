@@ -81,6 +81,7 @@ class ReportAssembler:
         self.chunk_counts: Counter = Counter()
         self.page_counts: dict[str, int] = {}
         self.contract_parties: list[str] = []
+        self._section_of = {}
         if all_chunks:
             by_doc: dict[str, list[dict]] = defaultdict(list)
             for c in all_chunks:
@@ -93,6 +94,10 @@ class ReportAssembler:
                     self.page_counts[doc] = max(pages)
                 for i, c in enumerate(chunks):
                     self._position[c["chunk_id"]] = (doc, i / max(1, len(chunks)))
+            # Section of every chunk, from document order (see _sections_in_order)
+            self._section_of: dict[str, str] = {}
+            for chunks in by_doc.values():
+                self._section_of.update(_sections_in_order(chunks))
             # The contract's parties: named in each document's opening chunk
             from nodes.node_5.ontology import find_parties
             for chunks in by_doc.values():
@@ -163,8 +168,8 @@ class ReportAssembler:
             "id": f"C{i:03d}",
             "pair_id": r["pair_id"],
             "type": r.get("change_status"),
-            "section": _section(heading_path),
-            "title": heading_path[-1] if heading_path else "",
+            "section": self._section_for(r, heading_path),
+            "title": _title(heading_path, evidence),
             "summary": im.get("summary", ""),
             "affected": affected,
             "status": im.get("status"),
@@ -182,10 +187,18 @@ class ReportAssembler:
             "attempts": im.get("attempts"),
             "evidence": evidence,
         }
+        change["key_numbers"] = _key_numbers(change)
         change["importance"] = _importance(change)
         if self.config.include_history:
             change["history"] = im.get("history", [])
         return change
+
+    def _section_for(self, r: dict[str, Any], heading_path: list[str]) -> str:
+        """Section from document order (new version first), else from the heading path."""
+        for cid in (r.get("target_chunk_id"), r.get("source_chunk_id")):
+            if cid in self._section_of:
+                return self._section_of[cid]
+        return _section(heading_path)
 
     def _documents(self) -> dict[str, Any]:
         out = {}
@@ -271,13 +284,118 @@ class ReportAssembler:
 
 _NUMBERED = re.compile(r"^\s*\d{1,2}\.(?!\d)")
 
+# "1. Definitions.", "17. Complete Agreement.", "26.Use of Name.Licensor ..."
+_TOP_WITH_TITLE = re.compile(r"^(\d{1,2})\.\s*([A-Z][^.\n]{1,160}?)\.(?:\s|$|(?=[A-Z]))")
+# "2. LICENSE", "2. Grant of License; Sublicenses; ... Supply and Sale" (a heading line
+# without a full stop, possibly continued on the next line)
+_TOP_LINE = re.compile(r"^(\d{1,2})\.\s*([A-Z][A-Za-z ,;&'’\-]{1,160})$")
+# "2.4 For a period ...", "10.3 ..." (numbered subsection)
+_SUB = re.compile(r"^(\d{1,2})\.\d{1,2}(?!\d)")
+# "SCHEDULE A"
+_SCHEDULE = re.compile(r"^SCHEDULE\s+([A-Z])\b", re.I)
+
+
+def _clean(text: str | None) -> str:
+    return " ".join((text or "").split())
+
+
+def _sections_in_order(chunks: list[dict[str, Any]]) -> dict[str, str]:
+    """
+    Section of every chunk, by walking the document in order: a chunk belongs to
+    the last top-level section ("2. Grant of License", "Schedule A") seen so far.
+    Node 1's heading tree can't be used for this: on a real EDGAR contract it
+    nested most clauses under recital "D." of the preamble.
+    """
+    names: dict[str, str] = {}
+    current = "Preamble"
+    current_num = 0          # section numbers only move forward
+    in_schedule = False      # numbered items inside a Schedule ("1. Licensor's ...") are not sections
+    out: dict[str, str] = {}
+    for c in chunks:
+        lines = [_clean(l) for l in (c.get("text") or "").splitlines()[:2]]
+        # The chunk's own first lines come before its heading: a merged heading line
+        # ("4.The Patents and Inventions.") sits above a clause headed "4.1 ..."
+        candidates = list(lines) + [_clean(h) for h in (c.get("heading_path") or [])[-1:]]
+        if len(lines) == 2 and re.fullmatch(r"\d{1,2}\.", lines[0]):   # "1." / "Definitions."
+            candidates.insert(0, f"{lines[0]} {lines[1]}")
+        for cand in candidates:
+            m = _SCHEDULE.match(cand)
+            if m:
+                current, in_schedule = f"Schedule {m.group(1).upper()}", True
+                break
+            if in_schedule:
+                continue
+            m = _TOP_WITH_TITLE.match(cand) or _TOP_LINE.match(cand)
+            if m and int(m.group(1)) >= current_num:
+                num, title = m.group(1), m.group(2).strip()
+                if len(title) > 60:                       # "Grant of License; Sublicenses; ..."
+                    title = title[:60].rsplit(" ", 1)[0].rstrip(";,") + " …"
+                names.setdefault(num, f"{num}. {title}")
+                current, current_num = names[num], int(num)
+                break
+            m = _SUB.match(cand)
+            if m and int(m.group(1)) >= current_num:
+                num = m.group(1)
+                if not current.startswith(f"{num}. ") and current != f"Section {num}":
+                    current = names.get(num, f"Section {num}")
+                current_num = int(num)
+                break
+        out[c["chunk_id"]] = current
+    return out
+
 
 def _section(heading_path: list[str]) -> str:
-    """Top-level section of a clause: the first numbered heading ("2. LICENSE"), else the first heading."""
+    """Fallback without document order: the first numbered heading, else "Other"."""
     for h in heading_path:
-        if _NUMBERED.match(h or ""):
-            return " ".join(h.split())
-    return " ".join(heading_path[0].split()) if heading_path else "Other"
+        h = _clean(h)
+        m = _SUB.match(h)
+        if m:
+            return f"Section {m.group(1)}"
+        if _NUMBERED.match(h):
+            return h[:70]
+    return "Other"
+
+
+def _title(heading_path: list[str], evidence: dict[str, Any]) -> str:
+    """
+    Short readable title: the clause heading, cleaned and cut at ~70 characters.
+    When the heading is not a real title (a table row like "5 – 10", a bullet,
+    empty), the first words of the changed sentence are used instead.
+    """
+    title = _clean(heading_path[-1]) if heading_path else ""
+    if sum(ch.isalpha() for ch in title) < 4:
+        side = evidence.get("new") or evidence.get("old") or {}
+        sentences = side.get("changed_sentences") or [s["text"] for s in side.get("sentences", [])]
+        title = _clean(sentences[0]) if sentences else title
+        title = re.sub(r"^[^A-Za-z]+", "", title)          # table text: "5 – 10 $[**] Licensee ..." -> "Licensee ..."
+    if len(title) > 70:
+        title = title[:70].rsplit(" ", 1)[0] + " …"
+    return title
+
+
+_UNIT_AFTER = r"\)?\s*(?:\(\w+\)\s*)?(?:calendar\s+|business\s+|successive\s+)?(?:days?|weeks?|months?|years?)\b"
+
+
+def _key_numbers(change: dict[str, Any]) -> dict[str, list[str]]:
+    """
+    The numbers in a change that matter: amounts ($), percentages (%) and
+    periods (days, months, years). Section references ("3.8" -> "3.7"),
+    addresses and zip codes are left out: on a real contract they otherwise
+    dominated the highlights.
+    """
+    texts = " ".join(e["text"] for e in change["evidence"].values() if e and e.get("text"))
+    keep = {}
+    for side, key in (("old", "only_in_source"), ("new", "only_in_target")):
+        out = []
+        for tok in change["numbers"].get(key) or []:
+            if "$" in tok or "%" in tok:
+                out.append(tok)
+            elif re.fullmatch(r"\d+\.\d+", tok):
+                continue                                  # section reference
+            elif re.search(rf"(?<![\d.,]){re.escape(tok)}{_UNIT_AFTER}", texts, re.I):
+                out.append(tok)
+        keep[side] = out
+    return keep
 
 
 def _importance(c: dict[str, Any]) -> int:
@@ -289,8 +407,8 @@ def _importance(c: dict[str, Any]) -> int:
         score += 2
     if c["duty"]["labels_added"]:
         score += 1
-    if c["numbers"].get("only_in_source") or c["numbers"].get("only_in_target"):
-        score += 3                                       # amounts, deadlines, notice periods
+    if c["key_numbers"]["old"] or c["key_numbers"]["new"]:
+        score += 3                                       # amounts, percentages, deadlines
     if c["type"] in ("ADDED", "DELETED") and (c["duty"]["labels_added"] or c["duty"]["labels_removed"]):
         score += 1
     return score
@@ -300,9 +418,9 @@ def _why(c: dict[str, Any]) -> str:
     reasons = []
     if c["duty"]["shift"]:
         reasons.append(f"duty shift {c['duty']['shift']}")
-    if c["numbers"].get("only_in_source") or c["numbers"].get("only_in_target"):
-        old = ", ".join(c["numbers"].get("only_in_source") or []) or "-"
-        new = ", ".join(c["numbers"].get("only_in_target") or []) or "-"
+    if c["key_numbers"]["old"] or c["key_numbers"]["new"]:
+        old = ", ".join(c["key_numbers"]["old"]) or "-"
+        new = ", ".join(c["key_numbers"]["new"]) or "-"
         reasons.append(f"numbers {old} -> {new}")
     if c["duty"]["labels_removed"] and not c["duty"]["shift"]:
         reasons.append("removes " + "/".join(c["duty"]["labels_removed"]).lower())

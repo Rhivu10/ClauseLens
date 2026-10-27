@@ -208,9 +208,18 @@ Adding results one at a time, in any order, gives the same report as `add_many()
 }
 ```
 
-**Highlights** are the confirmed (VERIFIED) changes ranked by: duty shift (+3), changed numbers such as amounts,
-deadlines and notice periods (+3), a removed obligation/prohibition (+2), a duty added (+1), an added/deleted clause
+**Highlights** are the confirmed (VERIFIED) changes ranked by: duty shift (+3), changed key numbers (+3), a removed obligation/prohibition (+2), a duty added (+1), an added/deleted clause
 with duties (+1). Unconfirmed changes are never highlighted; they are listed under `needs_review`.
+**Key numbers** are amounts ($), percentages and periods ("30 days", "2 years"); section references ("2.4"),
+addresses and zip codes are ignored, so they never make a change look important.
+
+**Sections** are found by reading the clauses in document order: a top heading ("2. Grant of License; ..." — also
+when it runs over two lines) opens a section, and its subclauses ("2.4") stay in it. Section numbers only move
+forward, and numbered items inside a Schedule ("1. Licensor's proprietary ...") stay in that Schedule. Clauses before
+the first section (title, parties, recitals A–D) are the "Preamble". Long section names are cut at ~60 characters.
+
+**Titles** are the clause heading, cleaned of odd whitespace; when the heading has no words (e.g. "5 – 10", "•") the
+first changed sentence is used instead (max ~70 characters).
 
 **Stakeholders:** Node 5's names are cleaned ("the Licensees" → Licensee, "Licensee / buyer" → Licensee,
 "either party" → Both parties, company-name fragments like "INC" dropped). A "Both parties" change is listed under
@@ -234,8 +243,8 @@ each of the contract's parties (found in the documents' opening clauses).
 
 - **The report is only as good as Nodes 3–5.** A LOW_CONFIDENCE summary is included but flagged; a wrong pair from
   Node 3 shows up as a wrong change.
-- **Sections** come from the first numbered heading in a clause's heading path; clauses without numbered headings
-  are grouped under their first heading or "Other".
+- **Sections** depend on Node 1's chunks starting at clause boundaries; an unusual numbering style (e.g. "Article
+  IV", "§ 4") falls back to the clause's heading path.
 - **Importance** is a simple rule-based score, not a legal judgement.
 - **Sending the data to the laptop UI** is not part of Node 6. The workflow's Streamlit UI was replaced by
   `clauselens-ui` (React + Vite, Node.js). Node 6 produces the JSON / `mockData.js` the UI reads; serving it from
