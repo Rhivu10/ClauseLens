@@ -57,6 +57,13 @@ state = run_pipeline("old.pdf", "new.pdf", PipelineConfig())
 state["report"]
 ```
 
+Ask questions about a finished report (Gemma E4B answers from the report only and
+cites the changes it uses, e.g. `[C003]`; the web app's Consult page runs the same code):
+
+```bash
+python -m pipeline.consult results/report.json "Which duties changed?" "What was removed?"
+```
+
 The web app runs exactly this code on Kaggle: its runner
 (`clauselens-ui/server/kaggle/runner.py`) only reads the uploaded PDFs, installs with
 `pipeline/install.py` and calls `run_pipeline`.

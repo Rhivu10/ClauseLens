@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { motion, useMotionValue, useTransform, animate, AnimatePresence } from "framer-motion";
 import DocumentLensMark from "@/components/DocumentLensMark";
+import Magnifier from "@/components/Magnifier";
 
 const WORD = "ClauseLens";
 const LENS_RADIUS = 42;
@@ -111,7 +112,7 @@ export default function IntroSplash({ onDone }) {
                 </motion.div>
               )}
 
-              {/* the lens ring + handle riding along the sweep — one SVG with correct geometry */}
+              {/* the magnifying glass riding along the sweep */}
               <motion.div
                 className="absolute pointer-events-none"
                 style={{
@@ -124,37 +125,7 @@ export default function IntroSplash({ onDone }) {
                   opacity: lensOpacity,
                 }}
               >
-                <svg
-                  viewBox={`0 0 ${RING_BOX} ${RING_BOX}`}
-                  width={RING_BOX}
-                  height={RING_BOX}
-                  style={{ filter: "drop-shadow(0 4px 14px rgba(106,69,38,0.35))" }}
-                >
-                  <circle
-                    cx={RING_BOX / 2}
-                    cy={RING_BOX / 2}
-                    r={LENS_RADIUS - 2}
-                    fill="none"
-                    stroke="var(--color-brass)"
-                    strokeWidth="4"
-                  />
-                  <circle
-                    cx={RING_BOX / 2 - 14}
-                    cy={RING_BOX / 2 - 14}
-                    r="5"
-                    fill="white"
-                    opacity="0.5"
-                  />
-                  <line
-                    x1={RING_BOX / 2 + (LENS_RADIUS - 2) * 0.72}
-                    y1={RING_BOX / 2 + (LENS_RADIUS - 2) * 0.72}
-                    x2={RING_BOX / 2 + (LENS_RADIUS + 22) * 0.72}
-                    y2={RING_BOX / 2 + (LENS_RADIUS + 22) * 0.72}
-                    stroke="var(--color-brass)"
-                    strokeWidth="7"
-                    strokeLinecap="round"
-                  />
-                </svg>
+                <Magnifier cx={RING_BOX / 2} cy={RING_BOX / 2} r={LENS_RADIUS} />
               </motion.div>
             </div>
           </div>

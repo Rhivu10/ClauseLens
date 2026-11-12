@@ -9,7 +9,14 @@ Kaggle runner and any script use it.
 ```bash
 python pipeline/install.py                          # once: the libraries (GPU machine)
 python -m pipeline old.pdf new.pdf --out results    # report.json, report.md, ui_data.json
+python -m pipeline.consult results/report.json "Which duties changed?"   # questions about a report
 ```
+
+`pipeline/consult.py` (Consult) answers questions about a finished report with Gemma E4B. For each
+question it picks the most relevant changes (embedding similarity, plus the changes needing review or
+with a duty shift when the question asks for those); Gemma may use only those and cites them as `[C012]`.
+Citations to changes it was not given are removed. Each answer has a `kind`: `cited`, `nothing` (the
+report has no such change) or `unsupported` (no citation, so treat it with care).
 
 From Python:
 

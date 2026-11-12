@@ -14,6 +14,11 @@
 // kept in server/data/partial.json, which the Alignment page shows until the
 // final report arrives.
 //
+// Consult: questions about the latest report run as a job of type "consult" on
+// the same notebook (pipeline/consult.py, Gemma E4B). Answers are kept per report
+// in server/data/consult/<report id>.json; questions asked while a batch runs are
+// queued and go in the next batch; a question asked before is answered at once.
+//
 // Finished reports are also kept in server/data/cache, keyed by a fingerprint
 // (SHA-256) of the two PDFs, the ClauseLens branch and runner.py. Uploading the
 // same two PDFs again opens the saved report at once instead of running Kaggle
@@ -34,6 +39,7 @@ const DATA = path.join(HERE, "data");
 const LATEST = path.join(DATA, "latest");
 const STATE_FILE = path.join(DATA, "job.json");
 const PARTIAL_FILE = path.join(DATA, "partial.json");
+const CONSULT_DIR = path.join(DATA, "consult");
 const CACHE = path.join(DATA, "cache");
 const RUNNER = path.join(HERE, "kaggle", "runner.py");
 const REPORT_FILES = ["report.json", "report.md", "ui_data.json", "status.json", "node5_results.jsonl"];
@@ -67,6 +73,8 @@ export const STAGES = [
   ["node_5_warmup", "Node 5 · warming up both models"],
   ["node_5_impact", "Node 5 · writing and checking impact summaries"],
   ["node_6_report", "Node 6 · assembling the report"],
+  ["consult_loading_model", "Loading Gemma E4B to answer"],
+  ["consult_answering", "Gemma is answering"],
   ["downloading", "Downloading the report"],
   ["done", "Report ready"],
 ];
@@ -241,7 +249,8 @@ const label = (name) => path.basename(name).replace(/\.pdf$/i, "");
 
 // Starts a comparison. files: {document_a: {name, buffer}, document_b: {name, buffer}}
 export async function startJob(files, { force = false } = {}) {
-  if (job && !["done", "error"].includes(job.state)) throw new Error("A comparison is already running.");
+  if (job && !["done", "error"].includes(job.state))
+    throw new Error(job.type === "consult" ? "Kaggle is answering questions right now. Try again in a few minutes." : "A comparison is already running.");
   const id = `job_${new Date().toISOString().replace(/[-:T]/g, "").slice(0, 14)}`;
   const commit = await branchCommit();
   const key = cacheKey(files, commit);
@@ -282,21 +291,25 @@ export async function startJob(files, { force = false } = {}) {
     cache_key: key,
     kernel_url: `https://www.kaggle.com/code/${user}/${KERNEL_SLUG}`,
   });
-  run(user, id, files).catch((e) => update({ state: "error", error: e.message }));
+  run(user, id, (dsDir, jobFile) => {
+    for (const [side, prefix] of [["document_a", "A"], ["document_b", "B"]]) {
+      const file = `${prefix}_${safeName(files[side].name)}`;
+      fs.writeFileSync(path.join(dsDir, file), files[side].buffer);
+      jobFile[side] = { file, name: label(files[side].name) };
+    }
+  }).catch((e) => update({ state: "error", error: e.message }));
   return job;
 }
 
-async function run(user, id, files) {
-  // 1. Dataset version with the two PDFs + the job file
+// writeInputs(dsDir, jobFile): puts the job's input files in the dataset folder and
+// fills in clauselens_job.json (the two PDFs for a comparison, report + questions for consult)
+async function run(user, id, writeInputs) {
+  // 1. Dataset version with the inputs + the job file
   const dsDir = path.join(WORK, "dataset");
   fs.rmSync(dsDir, { recursive: true, force: true });
   fs.mkdirSync(dsDir, { recursive: true });
   const jobFile = { job_id: id, repo_branch: REPO_BRANCH };
-  for (const [side, prefix] of [["document_a", "A"], ["document_b", "B"]]) {
-    const file = `${prefix}_${safeName(files[side].name)}`;
-    fs.writeFileSync(path.join(dsDir, file), files[side].buffer);
-    jobFile[side] = { file, name: label(files[side].name) };
-  }
+  writeInputs(dsDir, jobFile);
   writeJSON(path.join(dsDir, "clauselens_job.json"), jobFile);
   const datasetId = `${user}/${DATASET_SLUG}`;
   writeJSON(path.join(dsDir, "dataset-metadata.json"), {
@@ -449,6 +462,10 @@ function handleLogLine(line, id, pieces) {
     return;
   }
   if (msg.job_id !== id) return; // an older run's log
+  if (kind === "answer") {
+    if (job.type === "consult") saveAnswers(job.report_id, [msg], { done: msg.done, total: msg.total });
+    return;
+  }
   if (kind === "preview") {
     writeJSON(PARTIAL_FILE, { job_id: id, ui: msg.ui, done: msg.done, total: msg.total, updated_at: new Date().toISOString() });
     update({ preview_ready: true, progress: { done: msg.done, total: msg.total } });
@@ -476,6 +493,7 @@ async function finishSafely(kernel, id, failed = false) {
 async function finish(kernel, id, failed = false) {
   stopFollowing();
   finishing = false;
+  if (job?.type === "consult") return finishConsult(kernel, id, failed);
   update({ stage: "downloading" });
   const outDir = path.join(WORK, "output");
   fs.rmSync(outDir, { recursive: true, force: true });
@@ -508,6 +526,126 @@ async function finish(kernel, id, failed = false) {
   if (job.cache_key) copyReport(outDir, path.join(CACHE, job.cache_key)); // for the next upload of the same PDFs
   update({ state: "done", stage: "done", finished_at, headline: status?.headline });
   fs.rmSync(PARTIAL_FILE, { force: true });
+}
+
+// ------------------------------------------------------------------ consult (AI answers)
+
+const norm = (q) => q.trim().toLowerCase().replace(/\s+/g, " ").replace(/[?.!]+$/, "");
+
+// The report questions are about: the latest one (its file content identifies it)
+function reportId() {
+  const f = path.join(LATEST, "report.json");
+  return fs.existsSync(f) ? sha256(fs.readFileSync(f)).slice(0, 16) : null;
+}
+
+function consultFile(rid) {
+  return path.join(CONSULT_DIR, `${rid}.json`);
+}
+
+function loadConsult(rid) {
+  return { answers: [], queued: [], asking: [], ...(readJSON(consultFile(rid)) || {}) };
+}
+
+function saveAnswers(rid, answers, progress) {
+  const store = loadConsult(rid);
+  for (const a of answers) {
+    if (!a?.question) continue;
+    const entry = { question: a.question, answer: a.answer, citations: a.citations || [], supported: !!a.supported, kind: a.kind,
+                    used: a.used || [], answered_at: new Date().toISOString() };
+    const i = store.answers.findIndex((x) => norm(x.question) === norm(a.question));
+    if (i >= 0) store.answers[i] = entry;
+    else store.answers.push(entry);
+    store.asking = store.asking.filter((q) => norm(q) !== norm(a.question));
+  }
+  writeJSON(consultFile(rid), store);
+  if (progress) update({ progress });
+}
+
+// State for the Consult page: saved answers, questions waiting, the running batch
+export function consultState() {
+  const rid = reportId();
+  if (!rid) return { report_id: null, answers: [], queued: [], asking: [], job: null };
+  const store = loadConsult(rid);
+  const running = job?.type === "consult" && job.report_id === rid && job.state === "running";
+  return { report_id: rid, ...store, asking: running ? store.asking : [], job: job?.type === "consult" ? job : null };
+}
+
+// Ask questions about the latest report. Answered ones come back at once; the rest
+// start a Kaggle batch, or wait for the next one if a batch is running.
+export async function askQuestions(questions) {
+  const rid = reportId();
+  if (!rid) throw new Error("There is no report yet. Run a comparison first.");
+  const busy = job && !["done", "error"].includes(job.state);
+  if (busy && job.type !== "consult") throw new Error("A comparison is running. Ask again when it's done.");
+  const store = loadConsult(rid);
+  const known = new Set([...store.answers.map((a) => a.question), ...store.queued, ...store.asking].map(norm));
+  for (const q of questions.map((q) => String(q).trim()).filter(Boolean)) {
+    if (!known.has(norm(q))) {
+      store.queued.push(q);
+      known.add(norm(q));
+    }
+  }
+  writeJSON(consultFile(rid), store);
+  if (!busy && store.queued.length) await startConsultJob(rid);
+  return consultState();
+}
+
+async function startConsultJob(rid) {
+  const store = loadConsult(rid);
+  const questions = store.queued.slice(0, 10);
+  if (!questions.length) return;
+  store.queued = store.queued.slice(questions.length);
+  store.asking = questions;
+  writeJSON(consultFile(rid), store);
+  const user = await getUsername();
+  const id = `ask_${new Date().toISOString().replace(/[-:T]/g, "").slice(0, 14)}`;
+  job = null;
+  update({
+    id,
+    type: "consult",
+    state: "running",
+    stage: "uploading",
+    error: null,
+    started_at: new Date().toISOString(),
+    report_id: rid,
+    questions,
+    progress: { done: 0, total: questions.length },
+    repo_branch: REPO_BRANCH,
+    kernel_url: `https://www.kaggle.com/code/${user}/${KERNEL_SLUG}`,
+  });
+  run(user, id, (dsDir, jobFile) => {
+    fs.copyFileSync(path.join(LATEST, "report.json"), path.join(dsDir, "report.json"));
+    Object.assign(jobFile, { type: "consult", report: { file: "report.json" }, questions });
+  }).catch((e) => failConsult(rid, e.message));
+}
+
+function failConsult(rid, message) {
+  // Questions of a failed batch go back to the queue, so they can be asked again
+  const store = loadConsult(rid);
+  store.queued = [...store.asking, ...store.queued];
+  store.asking = [];
+  writeJSON(consultFile(rid), store);
+  update({ state: "error", error: message });
+}
+
+async function finishConsult(kernel, id, failed) {
+  update({ stage: "downloading" });
+  const outDir = path.join(WORK, "output");
+  fs.rmSync(outDir, { recursive: true, force: true });
+  fs.mkdirSync(outDir, { recursive: true });
+  try {
+    await kaggle(["kernels", "output", kernel, "-p", outDir, "-o", "-q", "--file-pattern", "^(status|answers)\\.json$"]);
+  } catch (e) {
+    if (!failed) throw e;
+  }
+  const status = readJSON(path.join(outDir, "status.json"));
+  const out = readJSON(path.join(outDir, "answers.json"));
+  const rid = job.report_id;
+  if (status?.job_id !== id || status?.stage === "error" || failed || !out?.answers)
+    return failConsult(rid, status?.error || "Answering on Kaggle failed. Open the notebook log on Kaggle to see why.");
+  saveAnswers(rid, out.answers);
+  update({ state: "done", stage: "done", finished_at: new Date().toISOString() });
+  if (loadConsult(rid).queued.length) startConsultJob(rid).catch((e) => failConsult(rid, e.message));
 }
 
 // After a dev-server restart, keep following a run that was still going

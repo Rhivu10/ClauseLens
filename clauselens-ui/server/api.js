@@ -6,10 +6,12 @@
 //                      (data = the PDF as base64). The same two PDFs again return the saved
 //                      report at once (state "done", cached: true) unless force is true.
 //   GET  /api/job      the current comparison: state, stage, error + the list of stages
+//   GET  /api/consult  saved answers for the latest report + the running batch
+//   POST /api/consult  {questions: [...]}: answered at once if asked before, else on Kaggle (Gemma)
 //   GET  /api/partial  the report as it fills in during a run ({ui, done, total}), 404 if none
 //   GET  /api/report   the latest finished report (Node 6 UI data + run: when/how it was made), 404 if none yet
 
-import { STAGES, checkSetup, currentJob, latestReport, partialReport, resume, startJob } from "./kaggle.js";
+import { STAGES, askQuestions, checkSetup, consultState, currentJob, latestReport, partialReport, resume, startJob } from "./kaggle.js";
 
 const MAX_BYTES = 60 * 1024 * 1024;
 
@@ -63,6 +65,12 @@ async function handle(req, res) {
         { force: Boolean(body.force) }
       );
       return send(res, 202, { job, stages: STAGES });
+    }
+    if (url === "/api/consult" && req.method === "GET") return send(res, 200, { ...consultState(), stages: STAGES });
+    if (url === "/api/consult" && req.method === "POST") {
+      const body = await readBody(req);
+      if (!Array.isArray(body.questions) || !body.questions.length) throw new Error("No question.");
+      return send(res, 202, { ...(await askQuestions(body.questions.slice(0, 10))), stages: STAGES });
     }
     if (url === "/api/partial" && req.method === "GET") {
       const partial = partialReport();

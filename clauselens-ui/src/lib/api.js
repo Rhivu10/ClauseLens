@@ -25,6 +25,13 @@ export const getSetup = () => request("/api/setup");
 export const getJob = () => request("/api/job");
 export const getReport = () => request("/api/report");
 export const getPartial = () => request("/api/partial");
+export const getConsult = () => request("/api/consult");
+export const askConsult = (questions) =>
+  request("/api/consult", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ questions }),
+  });
 
 // force: run on Kaggle even if these two PDFs were compared before (otherwise the
 // saved report comes back at once, with job.state "done" and job.cached true)
@@ -75,7 +82,7 @@ export function useLiveReport() {
         /* server restarting: try again */
       }
       if (!alive) return;
-      if (job?.state === "running") {
+      if (job?.state === "running" && job.type !== "consult") {
         try {
           const p = await getPartial();
           if (alive) setState({ status: "ready", data: withRows(p.ui), error: null, live: { done: p.done, total: p.total }, job });

@@ -13,6 +13,10 @@
 #     ui_data.json         the report in the shape the UI reads
 #     node5_results.jsonl  every Node 5 attempt (summaries, checks, verdicts)
 #
+# A job of type "consult" instead answers questions about a finished report
+# (pipeline/consult.py, Gemma E4B): the dataset then holds report.json and the
+# questions, the answers go to answers.json and, live, to "answer" log lines.
+#
 # Live results: the pipeline's on_preview / on_result hooks print the report as
 # it fills in, as "[ClauseLensData ...]" log lines (base64 JSON in 8 KB pieces);
 # "[ClauseLens] <stage>" lines are progress. The laptop follows the log live.
@@ -74,6 +78,11 @@ def find_job():
     path = hits[0]
     job = json.load(open(path, encoding="utf-8"))
     folder = os.path.dirname(path)
+    if job.get("type") == "consult":
+        job["report_path"] = os.path.join(folder, job["report"]["file"])
+        if not os.path.exists(job["report_path"]):
+            raise FileNotFoundError("report.json is missing from the clauselens-input dataset.")
+        return job
     for side in ("document_a", "document_b"):
         job[side]["path"] = os.path.join(folder, job[side]["file"])
         if not os.path.exists(job[side]["path"]):
@@ -111,10 +120,32 @@ def clone_repo(branch=REPO_BRANCH):
     return subprocess.check_output(["git", "-C", REPO_PATH, "log", "--oneline", "-1"], text=True).strip()
 
 
+def consult(job):
+    """Answer questions about a finished report (pipeline/consult.py)."""
+    from nodes.node_5 import load_agent_model
+    from pipeline.consult import CONSULT_MODEL, Consultant
+    questions = job["questions"]
+    stage("consult_loading_model")
+    model, tokenizer = load_agent_model(base_model=CONSULT_MODEL, device_index=0, max_seq_length=4096,
+                                        hf_token=hf_token())
+    consultant = Consultant(json.load(open(job["report_path"], encoding="utf-8")), model, tokenizer)
+    stage("consult_answering", questions=len(questions))
+    answers = []
+    for i, q in enumerate(questions, 1):
+        a = {k: v for k, v in consultant.answer(q).items() if k != "raw"}
+        answers.append(a)
+        emit_data("answer", {**a, "done": i, "total": len(questions)})
+    with open(f"{OUT}/answers.json", "w", encoding="utf-8") as fh:
+        json.dump({"job_id": JOB["job_id"], "answers": answers}, fh, ensure_ascii=False, indent=2)
+    stage("done", answers=len(answers))
+
+
 def run():
     job = find_job()
     JOB["job_id"] = job["job_id"]
-    stage("started", files=[job["document_a"]["file"], job["document_b"]["file"]])
+    is_consult = job.get("type") == "consult"
+    stage("started", **({"questions": len(job["questions"])} if is_consult
+                        else {"files": [job["document_a"]["file"], job["document_b"]["file"]]}))
 
     stage("installing")
     commit = clone_repo(job.get("repo_branch") or REPO_BRANCH)
@@ -128,6 +159,8 @@ def run():
     print("GPUs:", [torch.cuda.get_device_name(i) for i in range(gpus)], flush=True)
     if gpus == 0:
         raise RuntimeError("No GPU: set the notebook accelerator to 'GPU T4 x2'.")
+    if is_consult:
+        return consult(job)
 
     config = PipelineConfig(
         checkpoint_path=find_checkpoint(),

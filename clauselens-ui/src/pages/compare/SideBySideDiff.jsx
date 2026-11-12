@@ -12,7 +12,7 @@ const SPINE =
 const PAGE_EDGE =
   "repeating-linear-gradient(180deg, var(--color-surface) 0 2px, color-mix(in srgb, var(--color-line) 65%, transparent) 2px 3.5px)";
 
-export default function SideBySideDiff({ documents, rows }) {
+export default function SideBySideDiff({ documents, rows, highlight }) {
   return (
     <div className="relative mx-auto max-w-4xl my-2">
       {/* stacked sheets peeking behind — thickness */}
@@ -47,7 +47,10 @@ export default function SideBySideDiff({ documents, rows }) {
             return (
               <section
                 key={row.id}
-                className="relative grid grid-cols-2 border-t border-(--color-line) first-of-type:border-t-0"
+                id={`change-${row.change_id}`}
+                className={`relative grid grid-cols-2 border-t border-(--color-line) first-of-type:border-t-0 scroll-mt-24 transition-colors duration-700 ${
+                  highlight && highlight === row.change_id ? "bg-(--color-brass)/10" : ""
+                }`}
               >
                 <StickyNote side={noteSide} accent={accent} label={STATUS_LABEL[row.status]} />
 

@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import Magnifier from "@/components/Magnifier";
 import { motion, AnimatePresence } from "framer-motion";
 
 // Shown while a comparison runs on Kaggle: a "detective going through the case
@@ -43,28 +44,11 @@ function Page({ seed }) {
 }
 
 function Lens() {
+  // lens centred at (72, 72) in a 160 x 160 box, handle to the lower right
   return (
-    <svg viewBox="0 0 200 200" width="160" height="160" style={{ filter: "drop-shadow(0 8px 20px rgba(41,36,29,0.35))" }}>
-      <defs>
-        <radialGradient id="parseGlass" cx="38%" cy="34%" r="70%">
-          <stop offset="0%" stopColor="#ffffff" stopOpacity="0.5" />
-          <stop offset="45%" stopColor="#ffffff" stopOpacity="0.06" />
-          <stop offset="100%" stopColor="var(--color-brass)" stopOpacity="0.14" />
-        </radialGradient>
-      </defs>
-      <circle cx="90" cy="90" r="72" fill="url(#parseGlass)" />
-      <circle cx="90" cy="90" r="72" fill="none" stroke="var(--color-brass)" strokeWidth="9" />
-      <circle cx="90" cy="90" r="65" fill="none" stroke="#ffffff" strokeOpacity="0.4" strokeWidth="2" />
-      <line
-        x1={90 + 72 * 0.707}
-        y1={90 + 72 * 0.707}
-        x2={90 + 72 * 0.707 + 54}
-        y2={90 + 72 * 0.707 + 54}
-        stroke="var(--color-brass)"
-        strokeWidth="18"
-        strokeLinecap="round"
-      />
-    </svg>
+    <div className="relative" style={{ width: 160, height: 160 }}>
+      <Magnifier cx={72} cy={72} r={61} shadow="0 8px 20px rgba(41,36,29,0.35)" />
+    </div>
   );
 }
 
