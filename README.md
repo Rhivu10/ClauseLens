@@ -31,8 +31,7 @@ and save the token as `~/.kaggle/access_token`
 
 Then open http://localhost:5173, choose the previous and the new version of a
 contract, and press **Run comparison**. The changed clauses appear after about 4–7
-minutes and the summaries fill in as they are written; a full run takes about 7–8
-minutes for a one-page document and about 16 minutes for a 20-page contract.
+minutes and the summaries fill in as they are written.
 Comparing the same two PDFs again opens the saved report at once.
 
 Sample PDFs to try are in [`clauselens-ui/test-documents`](clauselens-ui/test-documents)
