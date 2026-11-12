@@ -12,7 +12,7 @@ export default function Nav() {
     <header className="border-b border-(--color-line) bg-(--color-bg)/85 backdrop-blur sticky top-0 z-30">
       <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <DocumentLensMark className="w-8 h-8" />
+          <DocumentLensMark className="w-10 h-10" />
           <div className="leading-none">
             <div className="font-semibold tracking-tight text-lg">ClauseLens</div>
             <div className="text-[10px] font-mono-label uppercase text-(--color-ink-faint)">

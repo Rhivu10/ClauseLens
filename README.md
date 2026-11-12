@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="clauselens-ui/public/clauselens-logo.png" alt="ClauseLens — policy diff · impact analysis" width="420">
+</p>
+
 # ClauseLens
 
 ClauseLens compares two versions of a contract and explains, clause by clause, what
