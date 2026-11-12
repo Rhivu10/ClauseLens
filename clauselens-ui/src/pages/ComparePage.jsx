@@ -57,6 +57,49 @@ export function EmptyState({ status, error }) {
   );
 }
 
+// Download the final report: PDF (a print page), Markdown or JSON
+const DOWNLOADS = [
+  ["pdf", "PDF", "Opens a print view: choose \"Save as PDF\""],
+  ["md", "Markdown", "report.md: the readable report"],
+  ["json", "JSON", "report.json: every field, for other tools"],
+];
+
+function DownloadReport() {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="relative mt-4 inline-block" onMouseLeave={() => setOpen(false)}>
+      <button
+        onClick={() => setOpen((o) => !o)}
+        aria-expanded={open}
+        className="inline-flex items-center gap-2 text-sm px-4 py-2 rounded-full bg-(--color-brass) text-(--color-brass-ink) hover:opacity-90 transition-opacity"
+      >
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+          <path d="M12 3v12m0 0l-5-5m5 5l5-5M4 19h16" />
+        </svg>
+        Download the report
+      </button>
+      {open && (
+        <div className="absolute z-20 left-1/2 -translate-x-1/2 mt-2 w-64 rounded-xl border border-(--color-line) bg-(--color-surface) shadow-lg p-1.5 text-left">
+          {DOWNLOADS.map(([format, label, hint]) => (
+            <a
+              key={format}
+              href={`/api/report/download?format=${format}`}
+              target={format === "pdf" ? "_blank" : undefined}
+              rel="noreferrer"
+              download={format === "pdf" ? undefined : ""}
+              onClick={() => setOpen(false)}
+              className="block rounded-lg px-3 py-2 hover:bg-(--color-surface-2)"
+            >
+              <div className="text-sm font-medium">{label}</div>
+              <div className="text-[12px] text-(--color-ink-faint)">{hint}</div>
+            </a>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function ComparePage() {
   const { status, data, error, live } = useLiveReport();
   const [filter, setFilter] = useState("all");
@@ -104,6 +147,7 @@ export default function ComparePage() {
             {new Date(data.run.finished_at).toLocaleString()}. Tick "Run again on Kaggle" on the upload page for a fresh run.
           </p>
         )}
+        {!live && <DownloadReport />}
         <div className="mt-3 flex items-center justify-center gap-5 text-xs font-mono text-(--color-ink-dim)">
           <Legend swatch="var(--color-diverge)" label="removed in B" />
           <Legend swatch="var(--color-cyan)" label="added in B" />

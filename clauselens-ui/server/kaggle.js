@@ -30,6 +30,7 @@
 import { spawn } from "node:child_process";
 import crypto from "node:crypto";
 import fs from "node:fs";
+import { marked } from "marked";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -178,6 +179,53 @@ export function partialReport() {
 export function latestReport() {
   const data = readJSON(path.join(LATEST, "ui_data.json"));
   return data && { ...data, run: readJSON(path.join(LATEST, "run.json")) };
+}
+
+// The latest finished report as a file to download:
+//   md   report.md (the readable report Node 6 writes)
+//   json report.json (everything, for other tools)
+//   pdf  report.md as a styled page that opens the print dialog ("Save as PDF")
+// Returns {filename, type, body, inline} or null when there is no report yet.
+export function reportDownload(format) {
+  const md = path.join(LATEST, "report.md");
+  const json = path.join(LATEST, "report.json");
+  if (!fs.existsSync(md) || !fs.existsSync(json)) return null;
+  const docs = readJSON(json)?.documents || {};
+  const names = [docs.document_a?.name, docs.document_b?.name].filter(Boolean);
+  const base = `ClauseLens report - ${names.join(" vs ") || "latest"}`.replace(/[\\/:*?"<>|]+/g, "_");
+  if (format === "json") return { filename: `${base}.json`, type: "application/json", body: fs.readFileSync(json) };
+  if (format === "md") return { filename: `${base}.md`, type: "text/markdown; charset=utf-8", body: fs.readFileSync(md) };
+  if (format === "pdf") {
+    const html = marked.parse(fs.readFileSync(md, "utf8"));
+    return { filename: `${base}.html`, type: "text/html; charset=utf-8", inline: true, body: printablePage(base, html) };
+  }
+  throw new Error(`Unknown format "${format}". Use md, json or pdf.`);
+}
+
+const escapeHtml = (s) => s.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
+
+function printablePage(title, html) {
+  return `<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>${escapeHtml(title)}</title>
+<style>
+  @page { margin: 18mm 16mm; }
+  body { font: 11pt/1.55 Georgia, "Times New Roman", serif; color: #29241d; max-width: 780px; margin: 32px auto; padding: 0 20px; }
+  h1, h2, h3, h4 { font-family: system-ui, "Segoe UI", sans-serif; color: #29241d; line-height: 1.25; break-after: avoid; }
+  h1 { font-size: 22pt; margin: 0 0 6px; } h2 { font-size: 15pt; margin-top: 28px; border-bottom: 1px solid #d8ccb6; padding-bottom: 4px; }
+  h3 { font-size: 12.5pt; margin-top: 22px; color: #6a4526; } h4 { font-size: 11pt; margin: 18px 0 4px; }
+  blockquote { margin: 8px 0; padding: 6px 12px; border-left: 3px solid #b08a5a; background: #f6f1e7; color: #4a4238; break-inside: avoid; }
+  table { border-collapse: collapse; width: 100%; margin: 8px 0; font-size: 10pt; }
+  th, td { border: 1px solid #d8ccb6; padding: 5px 8px; text-align: left; vertical-align: top; } th { background: #efe7d8; }
+  code { font-size: 9.5pt; } li { margin: 3px 0; }
+  .bar { font: 10pt system-ui, sans-serif; background: #efe7d8; border: 1px solid #d8ccb6; border-radius: 10px; padding: 10px 14px; margin-bottom: 24px; }
+  .bar button { font: inherit; margin-left: 8px; padding: 4px 12px; border-radius: 999px; border: 1px solid #6a4526; background: #6a4526; color: #f4ecdc; cursor: pointer; }
+  @media print { .bar { display: none; } body { margin: 0; max-width: none; } }
+</style></head>
+<body>
+<div class="bar">To save as PDF, choose <b>Save as PDF</b> as the printer. <button onclick="print()">Print / Save as PDF</button></div>
+${html}
+<script>addEventListener("load", () => setTimeout(() => print(), 300));</script>
+</body></html>`;
 }
 
 // ------------------------------------------------------------------ result cache

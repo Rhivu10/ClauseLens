@@ -9,9 +9,10 @@
 //   GET  /api/consult  saved answers for the latest report + the running batch
 //   POST /api/consult  {questions: [...]}: answered at once if asked before, else on Kaggle (Gemma)
 //   GET  /api/partial  the report as it fills in during a run ({ui, done, total}), 404 if none
+//   GET  /api/report/download?format=md|json|pdf   the latest report as a file (pdf: a page to print / save as PDF)
 //   GET  /api/report   the latest finished report (Node 6 UI data + run: when/how it was made), 404 if none yet
 
-import { STAGES, askQuestions, checkSetup, consultState, currentJob, latestReport, partialReport, resume, startJob } from "./kaggle.js";
+import { STAGES, askQuestions, checkSetup, consultState, currentJob, latestReport, partialReport, reportDownload, resume, startJob } from "./kaggle.js";
 
 const MAX_BYTES = 60 * 1024 * 1024;
 
@@ -75,6 +76,15 @@ async function handle(req, res) {
     if (url === "/api/partial" && req.method === "GET") {
       const partial = partialReport();
       return partial ? send(res, 200, partial) : send(res, 404, { error: "No live results yet." });
+    }
+    if (url === "/api/report/download" && req.method === "GET") {
+      const format = new URL(req.url, "http://localhost").searchParams.get("format") || "md";
+      const file = reportDownload(format);
+      if (!file) return send(res, 404, { error: "No report yet. Run a comparison first." });
+      res.statusCode = 200;
+      res.setHeader("Content-Type", file.type);
+      res.setHeader("Content-Disposition", `${file.inline ? "inline" : "attachment"}; filename*=UTF-8''${encodeURIComponent(file.filename)}`);
+      return res.end(file.body);
     }
     if (url === "/api/report" && req.method === "GET") {
       const report = latestReport();
