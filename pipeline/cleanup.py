@@ -7,8 +7,12 @@ The same clean-up the real-contract notebook runs (CELL 8):
   2. splits long chunks: one per definition ("Territory" means ...), one per numbered
      section ("11. Insurance."), then at line boundaries. Node 1 doesn't enforce
      max_chars, and Node 3 only reads the first 1,200 characters of a chunk.
-  3. merges tiny fragments (table headings like "Date Filed", "SCHEDULE A", a lone "1.")
+  3. splits ALL-CAPS paragraphs (warranty / liability disclaimers) and the text after
+     them into clauses of their own, so they are not glued to the last numbered clause
+  4. merges tiny fragments (table headings like "Date Filed", "SCHEDULE A", a lone "1.")
      into the next chunk
+
+The same code as the ClauseLens UI's Kaggle runner (server/kaggle/runner.py).
 """
 
 from __future__ import annotations
@@ -80,6 +84,40 @@ def _split_long(text: str, max_chars: int) -> list[tuple[str, str | None]]:
     return [(t, h) for t, h in out if t.strip()]
 
 
+_SENTENCE_END = re.compile(r"""[.;:!?]["'”’)\]]*\s*$""")
+
+
+def _is_caps_line(line: str) -> bool:
+    letters = [ch for ch in line if ch.isalpha()]
+    return len(letters) >= 12 and sum(ch.isupper() for ch in letters) / len(letters) > 0.9
+
+
+def _split_caps_blocks(text: str, head: str | None) -> list[tuple[str, str | None]]:
+    """
+    Split where an ALL-CAPS paragraph (4+ words) starts right after a finished
+    sentence, and where normal text starts right after an ALL-CAPS paragraph ends.
+    On the Apache License, the warranty disclaimer and the closing note were glued
+    to the last numbered condition, so "6. ... + disclaimer" matched "5. ... +
+    disclaimer" in the other version. A split-off piece is headed by its first words.
+    """
+    lines = text.splitlines()
+    pieces: list[tuple[list[str], str | None]] = [([], head)]
+    caps_words = 0                      # words in the ALL-CAPS lines just before this line
+    for i, line in enumerate(lines):
+        prev = lines[i - 1] if i else ""
+        caps, prev_caps = _is_caps_line(line), _is_caps_line(prev)
+        starts_caps = caps and not prev_caps and len(line.split()) >= 4 and _SENTENCE_END.search(prev)
+        # only after a real paragraph: a party name like "ECHO THERAPEUTICS, INC." in a
+        # signature block is not a block of its own
+        ends_caps = prev_caps and not caps and line.strip() and _SENTENCE_END.search(prev) and caps_words >= 8
+        caps_words = caps_words + len(line.split()) if caps else 0
+        if pieces[-1][0] and (starts_caps or ends_caps):
+            first = " ".join(line.split()[:8])
+            pieces.append(([], first[:60]))
+        pieces[-1][0].append(line)
+    return [("\n".join(p), h) for p, h in pieces if "".join(p).strip()]
+
+
 def clean_chunks(
     result: dict[str, Any],
     max_chars: int = 1500,
@@ -110,6 +148,9 @@ def clean_chunks(
                 parts = _split_long(text, max_chars)
             else:
                 parts = [(text, None)]
+            # ALL-CAPS paragraphs (warranty / liability disclaimers) and the text after
+            # them are their own clauses, not part of the clause before
+            parts = [q for part, head in parts for q in _split_caps_blocks(part, head)]
             split += len(parts) > 1
             for k, (part, head) in enumerate(parts):
                 path = list(c.get("heading_path") or [])
