@@ -131,10 +131,18 @@ Compare the two clauses. Reply with exactly ONE word:
 # JSON STOP CRITERIA
 # ============================================================
 
+def _text_tokenizer(tokenizer):
+    """
+    The plain text tokenizer. For Gemma 4, Unsloth returns a Gemma4Processor,
+    which wraps the tokenizer and has no pad(), get_vocab() or eos_token_id.
+    """
+    return getattr(tokenizer, "tokenizer", None) or tokenizer
+
+
 def _brace_token_ids(tokenizer) -> set[int]:
     """Token ids whose surface form contains '}' (covers '}', '{}', '}}', ...)."""
     try:
-        vocab = tokenizer.get_vocab()
+        vocab = _text_tokenizer(tokenizer).get_vocab()
     except Exception:
         return set()
     return {i for tok, i in vocab.items() if "}" in tok}
@@ -149,7 +157,7 @@ def _make_json_stop_criteria(tokenizer, prompt_len: int):
     from transformers import StoppingCriteria
 
     brace_ids = _brace_token_ids(tokenizer)
-    eos = getattr(tokenizer, "eos_token_id", None)
+    eos = getattr(_text_tokenizer(tokenizer), "eos_token_id", None)
     eos_ids = {eos} if isinstance(eos, int) else set(eos or [])
 
     class StopAtFirstBrace(StoppingCriteria):
@@ -277,13 +285,14 @@ class GemmaVerifier:
 
         # Left padding: all rows share one prompt length, so slicing the
         # generated part per row is a simple [prompt_len:].
-        old_side = getattr(self.tokenizer, "padding_side", "right")
-        old_pad = getattr(self.tokenizer, "pad_token", None)
+        tok = _text_tokenizer(self.tokenizer)
+        old_side = getattr(tok, "padding_side", "right")
+        old_pad = getattr(tok, "pad_token", None)
         try:
-            self.tokenizer.padding_side = "left"
-            if self.tokenizer.pad_token is None:
-                self.tokenizer.pad_token = self.tokenizer.eos_token
-            batch = self.tokenizer.pad(
+            tok.padding_side = "left"
+            if tok.pad_token is None:
+                tok.pad_token = tok.eos_token
+            batch = tok.pad(
                 {"input_ids": [e["input_ids"] for e in encoded],
                  "attention_mask": [e.get("attention_mask", [1] * len(e["input_ids"])) for e in encoded]},
                 padding=True,
@@ -305,9 +314,9 @@ class GemmaVerifier:
                     **generate_kwargs,
                 )
         finally:
-            self.tokenizer.padding_side = old_side
-            if old_pad is None and self.tokenizer.pad_token is not None:
-                self.tokenizer.pad_token = None
+            tok.padding_side = old_side
+            if old_pad is None and tok.pad_token is not None:
+                tok.pad_token = None
             self._batches += 1
             self._cleanup()
 
