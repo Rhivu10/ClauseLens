@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { Link } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { Link, useSearchParams } from "react-router-dom";
 import SideBySideDiff from "./compare/SideBySideDiff";
 import { useLiveReport } from "@/lib/api";
 import MagneticButton from "@/components/MagneticButton";
@@ -60,6 +60,21 @@ export function EmptyState({ status, error }) {
 export default function ComparePage() {
   const { status, data, error, live } = useLiveReport();
   const [filter, setFilter] = useState("all");
+  // ?change=C012 (from a Consult citation): show that change, scrolled into view
+  const [params] = useSearchParams();
+  const target = params.get("change");
+  const [highlight, setHighlight] = useState(null);
+  useEffect(() => {
+    if (status !== "ready" || !target) return;
+    setFilter("all");
+    setHighlight(target);
+    const t = setTimeout(() => document.getElementById(`change-${target}`)?.scrollIntoView({ behavior: "smooth", block: "start" }), 300);
+    const off = setTimeout(() => setHighlight(null), 4000);
+    return () => {
+      clearTimeout(t);
+      clearTimeout(off);
+    };
+  }, [status, target]);
   if (status !== "ready") return <EmptyState status={status} error={error} />;
 
   const { overview, documents } = data;
@@ -111,7 +126,7 @@ export default function ComparePage() {
       </div>
 
       {rows.length ? (
-        <SideBySideDiff documents={documents} rows={rows} />
+        <SideBySideDiff documents={documents} rows={rows} highlight={highlight} />
       ) : (
         <p className="text-center font-serif-text italic text-(--color-ink-faint) py-12">No changes in this group.</p>
       )}

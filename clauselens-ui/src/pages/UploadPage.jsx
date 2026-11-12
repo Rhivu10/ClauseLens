@@ -88,7 +88,7 @@ export default function UploadPage() {
   useEffect(() => {
     getSetup().then(setSetup).catch((e) => setSetup({ ok: false, error: e.message }));
     getJob()
-      .then((r) => r.job?.state === "running" && setRun(r))
+      .then((r) => r.job?.state === "running" && r.job.type !== "consult" && setRun(r))
       .catch(() => {});
   }, []);
 
