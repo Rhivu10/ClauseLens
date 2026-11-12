@@ -20,12 +20,10 @@ One-time setup on this laptop:
 2. On kaggle.com → Settings → API → **Generate New Token**, and save the token
    text as `C:\Users\<you>\.kaggle\access_token` (an older `kaggle.json` works too).
 3. The Kaggle account must be phone-verified (needed for GPU + internet).
-4. The account must be able to read the CUAD adapter dataset
-   `tdhanush24/checkpoints` (checkpoint-2091). To use another copy, set
-   `CLAUSELENS_CHECKPOINT_DATASET=<owner>/<dataset>` before `npm run dev`.
 
-`npm run setup` checks all of this (Node, Python, the Kaggle tool, the token, access
-to the adapter dataset) and says what to fix.
+The CUAD adapter (checkpoint-2091) comes with the repo (`Model Finetuning/checkpoints`),
+so no Kaggle dataset access is needed. `npm run setup` checks all of this (Node, Python,
+the Kaggle tool, the token) and says what to fix.
 
 Then `npm run dev`, open **Intake**, choose the two PDFs and press **Run comparison**.
 
@@ -34,7 +32,7 @@ What happens (`server/kaggle.js`):
 1. The PDFs are uploaded as a new version of your private dataset `clauselens-input`.
 2. `server/kaggle/runner.py` is pushed as your private notebook `clauselens-runner`
    (GPU T4 x2, internet on), which starts a run. It clones ClauseLens `main`
-   and runs Nodes 1–6, the same steps as the real-contract test notebook.
+   (including the adapter weights) and runs Nodes 1–6.
 3. The page shows the stage from the notebook log. A full run takes about 7–8 minutes for a
    1-page document and ~16 minutes for a 20-page contract; the changed clauses appear after
    ~4–7 minutes and the impact summaries fill in as they are written.
@@ -57,7 +55,7 @@ the page shows the error and a link to the notebook log on Kaggle.
 | Setting (environment variable) | Default |
 |---|---|
 | `CLAUSELENS_PYTHON` | `python` (the Python that has `kaggle` installed) |
-| `CLAUSELENS_CHECKPOINT_DATASET` | `tdhanush24/checkpoints` |
+| `CLAUSELENS_CHECKPOINT_DATASET` | not set: the adapter in the repo is used. Set `<owner>/<dataset>` to use another copy from Kaggle |
 | `CLAUSELENS_DATASET` / `CLAUSELENS_KERNEL` | `clauselens-input` / `clauselens-runner` |
 
 ## What's already built

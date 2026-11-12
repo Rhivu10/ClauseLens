@@ -1,7 +1,8 @@
 # ============================================================================
 # ClauseLens — full pipeline (Nodes 1-6) through the LangGraph mapping
 # Kaggle, accelerator: GPU T4 x2, internet on.
-# Add the CUAD adapter dataset (checkpoint-2091) and a dataset with your two PDFs.
+# Add a dataset with your two PDFs. The CUAD adapter (checkpoint-2091) comes with
+# the repo (Model Finetuning/checkpoints), so no other dataset is needed.
 # Each "# %%" marker is one Kaggle cell. Run them in order.
 # ============================================================================
 
@@ -47,7 +48,6 @@ PDF_A = find("Echo_Ferndale_2009_original.pdf")    # previous version
 PDF_B = find("Echo_Ferndale_2012_restated.pdf")    # new version
 
 cfg = PipelineConfig(
-    checkpoint_path=os.path.dirname(find("checkpoint-2091/adapter_config.json")),
     document_names=("License Agreement (2009)", "Amended and Restated License Agreement (2012)"),
     output_dir="/kaggle/working/clauselens_outputs",
 )

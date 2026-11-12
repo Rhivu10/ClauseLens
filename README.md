@@ -37,12 +37,12 @@ Sample PDFs to try are in [`clauselens-ui/test-documents`](clauselens-ui/test-do
 ### Run in a Kaggle notebook instead
 
 Open [`notebooks/ClauseLens_LangGraph_Pipeline.py`](notebooks/ClauseLens_LangGraph_Pipeline.py)
-on Kaggle (accelerator **GPU T4 x2**, internet on), add the CUAD adapter dataset and
-a dataset with your two PDFs, and run the cells. It calls the same pipeline:
+on Kaggle (accelerator **GPU T4 x2**, internet on), add a dataset with your two PDFs,
+and run the cells. It calls the same pipeline:
 
 ```python
 from pipeline import PipelineConfig, run_pipeline
-state = run_pipeline("old.pdf", "new.pdf", PipelineConfig(checkpoint_path=".../checkpoint-2091"))
+state = run_pipeline("old.pdf", "new.pdf", PipelineConfig())
 state["report"]
 ```
 
@@ -62,7 +62,7 @@ state["report"]
 - Each node: `nodes/node_N/NODE N DOCUMENTATION.md` ([Node 1](nodes/node_1), [2](nodes/node_2), [3](nodes/node_3), [4](nodes/node_4), [5](nodes/node_5), [6](nodes/node_6))
 - Pipeline: [`pipeline/PIPELINE DOCUMENTATION.md`](pipeline/PIPELINE%20DOCUMENTATION.md)
 - Web app and Kaggle connection: [`clauselens-ui/README.md`](clauselens-ui/README.md)
-- Fine-tuning the CUAD adapter: [`Model Finetuning/`](Model%20Finetuning)
+- The CUAD adapter (fine-tuned weights) and how it was trained: [`Model Finetuning/`](Model%20Finetuning)
 
 ## Repository
 
@@ -71,7 +71,7 @@ nodes/            Nodes 1–6
 pipeline/         LangGraph mapping of Nodes 1–6
 clauselens-ui/    web app (React + Vite) and the Kaggle runner
 notebooks/        Kaggle notebooks
-Model Finetuning/ training notebook for the CUAD adapter
+Model Finetuning/ the CUAD adapter weights (checkpoint-2091) and its training notebook
 ```
 
 The first complete version is kept as tag [`v1.0`](https://github.com/Rhivu10/ClauseLens/tree/v1.0).

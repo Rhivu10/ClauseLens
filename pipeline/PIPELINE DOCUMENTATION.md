@@ -9,7 +9,6 @@ instead of wiring the nodes by hand in every notebook:
 from pipeline import PipelineConfig, run_pipeline
 
 cfg = PipelineConfig(
-    checkpoint_path="/kaggle/input/checkpoints/checkpoint-2091",   # CUAD LoRA adapter
     document_names=("License Agreement (2009)", "Amended and Restated (2012)"),
     output_dir="/kaggle/working/clauselens_outputs",
 )
@@ -99,7 +98,7 @@ for its progress bar.
 
 | Field | Default | Meaning |
 |---|---|---|
-| `checkpoint_path` | — | CUAD LoRA adapter folder (`checkpoint-2091`) |
+| `checkpoint_path` | the repo's `Model Finetuning/checkpoints/checkpoint-2091` | CUAD LoRA adapter folder |
 | `hf_token` | `None` | Hugging Face token (the `unsloth/*` models are public) |
 | `document_names` | `("Document A", "Document B")` | Names shown in the report |
 | `start_new_chunk_on_level` | `2` | Node 1 setting |

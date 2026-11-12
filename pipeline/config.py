@@ -5,6 +5,7 @@ Configuration for one run of Nodes 1-6.
 
 from __future__ import annotations
 
+import os
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -12,11 +13,16 @@ from nodes.node_3 import Node3Config
 from nodes.node_4 import Node4Config
 from nodes.node_5 import Node5Config
 
+# The CUAD LoRA adapter shipped with the repo
+DEFAULT_CHECKPOINT = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                                  "Model Finetuning", "checkpoints", "checkpoint-2091")
+
 
 @dataclass
 class PipelineConfig:
-    # CUAD LoRA adapter folder (checkpoint-2091) for the Node 3 / Node 4 model
-    checkpoint_path: str
+    # CUAD LoRA adapter folder (checkpoint-2091) for the Node 3 / Node 4 model;
+    # by default the copy in the repo (Model Finetuning/checkpoints/checkpoint-2091)
+    checkpoint_path: str = DEFAULT_CHECKPOINT
 
     # Hugging Face token; None works for the public unsloth/* models
     hf_token: str | None = None

@@ -41,10 +41,11 @@ const REPORT_FILES = ["report.json", "report.md", "ui_data.json", "status.json",
 const PYTHON = process.env.CLAUSELENS_PYTHON || "python";
 const DATASET_SLUG = process.env.CLAUSELENS_DATASET || "clauselens-input";
 const KERNEL_SLUG = process.env.CLAUSELENS_KERNEL || "clauselens-runner";
-// The CUAD LoRA adapter (checkpoint-2091) used by Node 3
 // ClauseLens branch the notebook clones (e.g. to test a branch before it is merged)
 const REPO_BRANCH = process.env.CLAUSELENS_REPO_BRANCH || "main";
-const CHECKPOINT_DATASET = process.env.CLAUSELENS_CHECKPOINT_DATASET || "tdhanush24/checkpoints";
+// The CUAD adapter is in the repo (Model Finetuning/checkpoints/checkpoint-2091) and the
+// runner loads it from there. Set this only to use another copy from a Kaggle dataset.
+const CHECKPOINT_DATASET = process.env.CLAUSELENS_CHECKPOINT_DATASET || null;
 const POLL_MS = Number(process.env.CLAUSELENS_POLL_MS) || 30_000;
 
 // Pipeline stages written by runner.py, in order, with what the UI shows
@@ -338,7 +339,7 @@ async function run(user, id, files) {
     enable_gpu: true,
     enable_internet: true,
     machine_shape: "NvidiaTeslaT4", // GPU T4 x2
-    dataset_sources: [datasetId, CHECKPOINT_DATASET],
+    dataset_sources: CHECKPOINT_DATASET ? [datasetId, CHECKPOINT_DATASET] : [datasetId],
     competition_sources: [],
     kernel_sources: [],
   });

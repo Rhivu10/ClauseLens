@@ -264,10 +264,15 @@ def find_job():
 
 
 def find_checkpoint():
+    """The CUAD LoRA adapter: in the cloned repo, or an attached Kaggle dataset."""
+    repo_copy = f"{REPO_PATH}/Model Finetuning/checkpoints/checkpoint-2091"
+    if os.path.exists(f"{repo_copy}/adapter_model.safetensors"):
+        return repo_copy
     hits = sorted(glob.glob("/kaggle/input/**/adapter_config.json", recursive=True),
                   key=lambda p: ("checkpoint-2091" not in p, p))
     if not hits:
-        raise FileNotFoundError("CUAD LoRA adapter (adapter_config.json) not found: attach the checkpoint dataset.")
+        raise FileNotFoundError("CUAD LoRA adapter not found in the repo (Model Finetuning/checkpoints/"
+                                "checkpoint-2091) or in an attached Kaggle dataset.")
     return os.path.dirname(hits[0])
 
 

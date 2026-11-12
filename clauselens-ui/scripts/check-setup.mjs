@@ -6,7 +6,7 @@
 import { spawnSync } from "node:child_process";
 
 const PYTHON = process.env.CLAUSELENS_PYTHON || "python";
-const CHECKPOINT = process.env.CLAUSELENS_CHECKPOINT_DATASET || "tdhanush24/checkpoints";
+const CHECKPOINT = process.env.CLAUSELENS_CHECKPOINT_DATASET || null; // the adapter is in the repo by default
 
 let problems = 0;
 const ok = (msg) => console.log(`  ✓ ${msg}`);
@@ -52,8 +52,9 @@ if (py.code === 0 && !kgMissing) {
     );
 }
 
-// 5. The CUAD LoRA adapter dataset (Node 3)
-if (user) {
+// 5. The CUAD LoRA adapter (Node 3): in the repo, unless another copy is set
+if (!CHECKPOINT) ok("CUAD adapter: loaded from the repo (Model Finetuning/checkpoints/checkpoint-2091)");
+else if (user) {
   const ds = run(PYTHON, ["-m", "kaggle.cli", "datasets", "files", CHECKPOINT]);
   if (ds.code === 0 && /adapter_config\.json/.test(ds.out)) ok(`CUAD adapter found: ${CHECKPOINT}`);
   else
