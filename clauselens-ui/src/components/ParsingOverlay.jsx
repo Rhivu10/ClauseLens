@@ -8,6 +8,8 @@ import { motion, AnimatePresence } from "framer-motion";
 // contract; the changed clauses show up after ~4–7 minutes (live preview).
 
 const LENS_LOOP = 3.6; // seconds per magnifier sweep
+const PAGE_EVERY_MS = 1400; // a new page slides in this often
+const PAGE_SLIDE_S = 0.7; // how long the slide takes
 
 function elapsed(since) {
   const s = Math.max(0, Math.round((Date.now() - new Date(since).getTime()) / 1000));
@@ -71,7 +73,7 @@ export default function ParsingOverlay({ job, stages, onClose, onPreview }) {
   const [, tick] = useState(0);
 
   useEffect(() => {
-    const riffle = setInterval(() => setPage((p) => p + 1), 430);
+    const riffle = setInterval(() => setPage((p) => p + 1), PAGE_EVERY_MS);
     const clock = setInterval(() => tick((t) => t + 1), 1000);
     return () => {
       clearInterval(riffle);
@@ -110,7 +112,7 @@ export default function ParsingOverlay({ job, stages, onClose, onPreview }) {
               initial={{ x: 130, rotate: 5, opacity: 0 }}
               animate={{ x: 0, rotate: 0, opacity: 1 }}
               exit={{ x: -150, rotate: -7, opacity: 0 }}
-              transition={{ duration: 0.42, ease: "easeInOut" }}
+              transition={{ duration: PAGE_SLIDE_S, ease: "easeInOut" }}
             >
               <Page seed={failed ? 0 : page} />
             </motion.div>
