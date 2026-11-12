@@ -550,7 +550,7 @@ function saveAnswers(rid, answers, progress) {
   const store = loadConsult(rid);
   for (const a of answers) {
     if (!a?.question) continue;
-    const entry = { question: a.question, answer: a.answer, citations: a.citations || [], supported: !!a.supported,
+    const entry = { question: a.question, answer: a.answer, citations: a.citations || [], supported: !!a.supported, kind: a.kind,
                     used: a.used || [], answered_at: new Date().toISOString() };
     const i = store.answers.findIndex((x) => norm(x.question) === norm(a.question));
     if (i >= 0) store.answers[i] = entry;

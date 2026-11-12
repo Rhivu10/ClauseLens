@@ -4,13 +4,15 @@ ClauseLens — Consult: answer questions about a finished report with Gemma.
 Answers are grounded in the report: for each question the most relevant changes
 are found (embedding similarity, plus all changes needing review / with a duty
 shift when the question asks for those), and Gemma may only use those changes.
-It cites them by id ([C012]); citations to changes it was not given are removed,
-and an answer without any citation is marked as unsupported.
+It cites them by id ([C012]); citations to changes it was not given are removed.
+An answer without citations is fine when it says the report has no such change
+("nothing"); otherwise it is marked as unsupported.
 
     from pipeline.consult import Consultant
     c = Consultant(report, model, tokenizer)          # report = Node 6 report (report.json)
     c.answer("What changed about the advertising clause?")
-    -> {"question", "answer", "citations": ["C002", ...], "used": [...], "supported": bool}
+    -> {"question", "answer", "citations": ["C002", ...], "used": [...], "supported": bool,
+        "kind": "cited" | "nothing" | "unsupported"}
 
 From a shell (GPU machine, after python pipeline/install.py):
 
@@ -30,6 +32,9 @@ MAX_NEW_TOKENS = 320
 _REVIEW_Q = re.compile(r"review|unsure|uncertain|low confidence|not sure", re.I)
 _DUTY_Q = re.compile(r"\bdut(y|ies)\b|obligation|shall|must|permission|prohibit|allowed to", re.I)
 _CITE = re.compile(r"\[(C\d{3,})\]")
+_OTHER_BRACKET = re.compile(r"\s*\[(?!C\d{3,}\])[^\]\n]{1,40}\]")       # "[Report overview]" etc.
+_NOTHING = re.compile(r"does ?n[o']t show|not (shown|mentioned|listed|covered|in the report)|no (listed )?changes?\b"
+                      r"|none of the (listed )?changes|zero changes|there (are|were) no", re.I)
 
 
 def _change_text(c: dict[str, Any], limit: int) -> str:
@@ -77,9 +82,14 @@ def clean_answer(raw: str, allowed_ids: set[str]) -> dict[str, Any]:
     bad = [i for i in _CITE.findall(text) if i not in allowed_ids]
     for i in set(bad):
         text = text.replace(f"[{i}]", "")
+    text = _OTHER_BRACKET.sub("", text)
     text = re.sub(r"\s+([.,;:])", r"\1", re.sub(r"[ \t]{2,}", " ", text)).strip()
     cites = list(dict.fromkeys(i for i in _CITE.findall(text) if i in allowed_ids))
-    return {"answer": text, "citations": cites, "removed_citations": sorted(set(bad)), "supported": bool(cites)}
+    # kind: "cited" (backed by changes), "nothing" (says the report has no such change:
+    # a valid answer that needs no citation), "unsupported" (claims without a source)
+    kind = "cited" if cites else "nothing" if _NOTHING.search(text) else "unsupported"
+    return {"answer": text, "citations": cites, "removed_citations": sorted(set(bad)),
+            "supported": kind != "unsupported", "kind": kind}
 
 
 class Consultant:

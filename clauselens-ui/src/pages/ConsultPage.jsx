@@ -27,6 +27,11 @@ const words = (text) =>
 // crude stem so "royalties" finds "royalty", "terminated" finds "termination"
 const stem = (w) => w.replace(/(ies|ied)$/, "y").replace(/(ing|ion|ions|ed|es|s)$/, "");
 
+// "cited", "nothing" (the report has no such change: fine without a citation) or
+// "unsupported"; answers saved before "kind" existed get it from their text
+const NOTHING = /does ?n[o']t show|not (shown|mentioned|listed|covered|in the report)|no (listed )?changes?\b|none of the (listed )?changes|zero changes|there (are|were) no/i;
+const kindOf = (a) => a.kind || (a.citations.length ? "cited" : NOTHING.test(a.answer) ? "nothing" : "unsupported");
+
 const norm = (q) => q.trim().toLowerCase().replace(/\s+/g, " ").replace(/[?.!]+$/, "");
 
 // The changes that match a question, shown while Gemma answers
@@ -142,7 +147,7 @@ export default function ConsultPage() {
             <Bubble user>{a.question}</Bubble>
             <Bubble>
               <AnswerText text={a.answer} known={known} />
-              {!a.supported && (
+              {kindOf(a) === "unsupported" && (
                 <div className="mt-2 text-[12.5px] text-(--color-diverge)">
                   Not supported: Gemma cited no change from the report, so treat this answer with care.
                 </div>
