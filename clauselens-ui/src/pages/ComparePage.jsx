@@ -3,6 +3,7 @@ import { Link, useSearchParams } from "react-router-dom";
 import SideBySideDiff from "./compare/SideBySideDiff";
 import { useLiveReport } from "@/lib/api";
 import { Button } from "@/components/ui/Button";
+import { Lamp } from "@/components/ui/Lamp";
 
 function Legend({ swatch, label }) {
   return (
@@ -124,10 +125,11 @@ export default function ComparePage() {
   return (
     <div className="max-w-7xl mx-auto px-6 py-10">
       <div className="max-w-4xl mx-auto text-center mb-7">
-        <span aria-hidden="true" className="block w-10 h-[3px] rounded-full bg-(--color-accent) mb-4 mx-auto" />
-        <h1 className="font-serif text-3xl">
-          Where the two versions agree — and where they don't
-        </h1>
+        <Lamp>
+          <h1 className="font-serif text-3xl">
+            Where the two versions agree — and where they don't
+          </h1>
+        </Lamp>
         {live ? (
           <div className="mt-3 inline-flex items-center gap-2 rounded-full border border-(--color-brass)/40 bg-(--color-surface) px-4 py-1.5 text-sm">
             <span className="w-1.5 h-1.5 rounded-full bg-(--color-brass) animate-pulse" />
