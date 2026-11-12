@@ -125,4 +125,32 @@ def party_is_grounded(party: str, text: str, allowed: list[str]) -> bool:
     for form in forms:
         if re.search(rf"\b{re.escape(form)}(?:s|es)?\b", low):
             return True
-    return False
+    return _described_party_in_text(p, low)
+
+
+# Words that say WHO without naming anyone ("creators of ...", "anyone who ...")
+_ROLE_WORDS = set("""
+anyone anybody everyone someone those people person persons party parties user users creator creators maker makers
+developer developers distributor distributors company companies entity entities individual individuals organization
+organizations organisation organisations owner owners holder holders business businesses who whoever
+""".split())
+_PARTY_STOP = set("of the this that these which with from for and any all their its who into onto by in on to an a".split())
+
+
+def _described_party_in_text(party: str, low_text: str) -> bool:
+    """
+    A party described rather than named, for documents without named parties
+    (licenses, policies): "creators of products derived from this software" passes
+    when "products", "derived" and "software" are all in the text. At least 3 words
+    and 2 content words, so a single invented name ("Customer") still fails.
+    Apache License 1.0 vs 1.1 (Kaggle, 12 Nov 2026): a correct summary was rejected
+    twice for naming exactly this party.
+    """
+    words = re.findall(r"[a-z]+", party)
+    if len(words) < 3:
+        return False
+    content = [w for w in words if w not in _PARTY_STOP and w not in _ROLE_WORDS and len(w) > 2]
+    if len(content) < 2:
+        return False
+    vocab = set(re.findall(r"[a-z]+", low_text))
+    return all(w in vocab or _singular(w) in vocab or w + "s" in vocab for w in content)
