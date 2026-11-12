@@ -1,0 +1,50 @@
+@import url('https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;1,6..72,400&family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-serif: "Newsreader", ui-serif, Georgia, serif;
+  --font-sans: "Space Grotesk", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, monospace;
+
+  /* "case file" base — aged paper beige, warm white, taupe rules */
+  --color-bg: #ece4d6;
+  --color-surface: #f8f5ee;
+  --color-surface-2: #e1d8c5;
+  --color-line: #c7bca4;
+
+  /* typewriter ink + warm greys */
+  --color-ink: #29241d;
+  --color-ink-dim: #5b5243;
+  --color-ink-faint: #8e8571;
+
+  /* primary accent: walnut brown (lens frame, actions) */
+  --color-brass: #6a4526;
+  --color-brass-dim: #4c2f18;
+  --color-brass-ink: #f4ecdc; /* fixed light text/icon color for use ON brown fills */
+
+  /* secondary accents: slate ink (match / added) + oxblood (diverge / removed) */
+  --color-cyan: #4f5a62;
+  --color-cyan-dim: #39424a;
+  --color-diverge: #9c3b2b;
+}
+
+html, body, #root { height: 100%; }
+
+body {
+  background-color: var(--color-bg);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+}
+
+::selection { background: var(--color-brass); color: var(--color-brass-ink); }
+
+.font-serif-text { font-family: var(--font-serif); }
+.font-mono-label { font-family: var(--font-mono); letter-spacing: 0.08em; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+}
