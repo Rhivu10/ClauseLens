@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { getJob, getSetup, startJob } from "@/lib/api";
-import { HoverBorderGradient } from "@/components/ui/HoverBorderGradient";
+import { Button } from "@/components/ui/Button";
 import ParsingOverlay from "@/components/ParsingOverlay";
 import { Dropzone, DropzoneContent, DropzoneEmptyState } from "@/components/ui/Dropzone";
 
@@ -127,9 +127,9 @@ export default function UploadPage() {
       </div>
 
       <div className="mt-8 flex items-center gap-5">
-        <HoverBorderGradient disabled={!ready} onClick={handleRun}>
+        <Button disabled={!ready} onClick={handleRun}>
           {sending ? "Sending to Kaggle…" : "Run comparison"}
-        </HoverBorderGradient>
+        </Button>
         <Link
           to="/compare"
           className="text-sm text-(--color-ink-dim) underline underline-offset-4 hover:text-(--color-ink)"

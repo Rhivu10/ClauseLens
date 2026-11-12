@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import SideBySideDiff from "./compare/SideBySideDiff";
 import { useLiveReport } from "@/lib/api";
-import { HoverBorderGradient } from "@/components/ui/HoverBorderGradient";
+import { Button } from "@/components/ui/Button";
 
 function Legend({ swatch, label }) {
   return (
@@ -48,9 +48,9 @@ export function EmptyState({ status, error }) {
               ? error
               : "Upload two versions of a contract. ClauseLens runs the models on Kaggle and the results appear here."}
           </p>
-          <HoverBorderGradient as={Link} to="/upload" containerClassName="mx-auto">
+          <Button as={Link} to="/upload" containerClassName="mx-auto">
             Upload two PDFs
-          </HoverBorderGradient>
+          </Button>
         </>
       )}
     </div>
@@ -68,12 +68,12 @@ function DownloadReport() {
   const [open, setOpen] = useState(false);
   return (
     <div className="relative mt-4 inline-block" onMouseLeave={() => setOpen(false)}>
-      <HoverBorderGradient onClick={() => setOpen((o) => !o)} aria-expanded={open}>
+      <Button onClick={() => setOpen((o) => !o)} aria-expanded={open}>
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
           <path d="M12 3v12m0 0l-5-5m5 5l5-5M4 19h16" />
         </svg>
         Download the report
-      </HoverBorderGradient>
+      </Button>
       {open && (
         <div className="absolute z-20 left-1/2 -translate-x-1/2 mt-2 w-64 rounded-xl border border-(--color-line) bg-(--color-surface) shadow-lg p-1.5 text-left">
           {DOWNLOADS.map(([format, label, hint]) => (

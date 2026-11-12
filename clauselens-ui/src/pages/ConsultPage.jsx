@@ -2,7 +2,7 @@ import { Fragment, useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { askConsult, getConsult, useReport } from "@/lib/api";
 import CitationChip from "@/components/CitationChip";
-import { HoverBorderGradient } from "@/components/ui/HoverBorderGradient";
+import { Button } from "@/components/ui/Button";
 import { EmptyState } from "@/pages/ComparePage";
 
 // Ask about the latest report. Gemma (pipeline/consult.py) answers on Kaggle, using
@@ -230,10 +230,10 @@ export default function ConsultPage() {
             placeholder="Ask about the changes…"
             className="flex-1 bg-transparent outline-none font-serif-text text-[15px] placeholder:text-(--color-ink-faint)"
           />
-          <HoverBorderGradient
+          <Button
             type="submit"
             disabled={!input.trim()}
-            containerClassName="shrink-0"
+            containerClassName="shrink-0 !p-1"
             className="!p-0 w-9 h-9"
             aria-label="Send"
           >
@@ -246,7 +246,7 @@ export default function ConsultPage() {
                 strokeLinejoin="round"
               />
             </svg>
-          </HoverBorderGradient>
+          </Button>
         </form>
       </div>
     </div>
