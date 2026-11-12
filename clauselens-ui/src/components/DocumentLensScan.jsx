@@ -1,4 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import Magnifier from "@/components/Magnifier";
 import { motion, useMotionValue, useTransform, animate } from "framer-motion";
 
 // Ambient hero animation: a magnifier lens reads the app's introduction the way
@@ -194,27 +195,7 @@ export default function DocumentLensScan({ className = "" }) {
               opacity: lensOpacity,
             }}
           >
-            <svg viewBox="0 0 220 220" width="100%" height="100%">
-              <defs>
-                <radialGradient id="scanGlass" cx="38%" cy="34%" r="70%">
-                  <stop offset="0%" stopColor="#ffffff" stopOpacity="0.42" />
-                  <stop offset="45%" stopColor="#ffffff" stopOpacity="0.06" />
-                  <stop offset="100%" stopColor="var(--color-brass)" stopOpacity="0.12" />
-                </radialGradient>
-              </defs>
-              <circle cx="110" cy="110" r="102" fill="url(#scanGlass)" />
-              <circle cx="110" cy="110" r="102" fill="none" stroke="var(--color-brass)" strokeWidth="7" />
-              <circle cx="110" cy="110" r="95" fill="none" stroke="#ffffff" strokeOpacity="0.4" strokeWidth="1.8" />
-              <line
-                x1={110 + 102 * 0.707}
-                y1={110 + 102 * 0.707}
-                x2={110 + 102 * 0.707 + 48}
-                y2={110 + 102 * 0.707 + 48}
-                stroke="var(--color-brass)"
-                strokeWidth="15"
-                strokeLinecap="round"
-              />
-            </svg>
+            <Magnifier cx={R} cy={R} r={R} shadow="0 8px 20px rgba(41,36,29,0.3)" />
           </motion.div>
         )}
       </div>
