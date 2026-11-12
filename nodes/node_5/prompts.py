@@ -94,7 +94,9 @@ def build_impact_prompt(view: dict[str, Any], limit: int, warning: str | None = 
 {_changed_block(view, limit)}{_texts_block(view, limit)}{warn}
 
 Write 2 or 3 short sentences: what is true in the NEW version compared to the OLD one, who is affected, and how.
-Use only facts stated in the text. Do not add numbers, dates or parties that are not in the text.{numbers}
+Use only facts stated in the text. Do not add numbers, dates or parties that are not in the text.
+Describe the change in the clause's own words. Do not add filler or judgement words such as
+"essentially", "slightly", "significantly", "clearly" or "potentially".{numbers}
 Then write one last line in this form, naming the affected parties:
 AFFECTED: party one; party two"""
 

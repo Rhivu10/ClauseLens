@@ -48,7 +48,16 @@ said says sentence sentences language phrase phrases additions additionally furt
 finally clarify clarifies clarified describe describes described mention mentions mentioned refer
 refers referenced item items part parts point points rule rules scope just rather found remain
 remains stays compared comparison difference differences listed details detailed
+definition definitions defined define defines involved updated update updates essentially slightly
+much meaning expanded expand expands expansion broadening broaden broadens broader narrower narrowed
+explicitly explicit exactly listing list lists replaces replace replaced replacing refines refine refined
+like type types concerning using used based simply newly
 """.split())
+# The last four lines: describing words that caused 18 of 29 first-attempt
+# rejections on the Echo-Ferndale run (12 Nov 2026), e.g. "The definition of
+# 'Device' was updated". Words whose 5-letter family would also cover content
+# words are left out on purpose: clearly (Clearance), significantly (signature),
+# covers (coverage), several (severance), constitutes (construction).
 
 
 # 3-letter words that carry no facts ("fee", "pay", "day" do, so they are checked)
