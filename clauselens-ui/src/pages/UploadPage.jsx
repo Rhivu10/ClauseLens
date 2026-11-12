@@ -99,6 +99,7 @@ export default function UploadPage() {
         transition={{ duration: 0.4 }}
         className="max-w-2xl mb-10"
       >
+        <span aria-hidden="true" className="block w-10 h-[3px] rounded-full bg-(--color-accent) mb-4 " />
         <h1 className="font-sans font-semibold text-4xl leading-tight mb-3">
           Place two versions of the same contract on the table.
         </h1>

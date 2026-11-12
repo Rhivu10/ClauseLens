@@ -61,7 +61,7 @@ export default function Nav() {
   }));
 
   return (
-    <header className="border-b border-(--color-line) bg-(--color-bg)/85 backdrop-blur sticky top-0 z-30">
+    <header className="shadow-[inset_0_3px_0_var(--color-accent)] border-b border-(--color-line) bg-(--color-bg)/85 backdrop-blur sticky top-0 z-30">
       <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
         <div className="flex items-center gap-3">
           <DocumentLensMark className="w-10 h-10" />

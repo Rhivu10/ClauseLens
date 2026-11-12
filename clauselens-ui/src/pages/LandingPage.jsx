@@ -27,7 +27,7 @@ export default function LandingPage() {
               lineGap={4}
               animationDuration={20}
             />
-            .
+            <span className="text-(--color-accent)">.</span>
           </h1>
           <p className="text-(--color-ink-dim) text-lg max-w-lg mb-9 [text-shadow:0_1px_10px_rgba(41,36,29,0.14)]">
             ClauseLens parses, indexes and aligns two policy documents clause by

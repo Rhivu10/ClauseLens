@@ -133,6 +133,7 @@ export default function ConsultPage() {
   return (
     <div className="max-w-3xl mx-auto px-6 py-8 flex flex-col h-[calc(100vh-4rem)]">
       <div className="mb-5">
+        <span aria-hidden="true" className="block w-10 h-[3px] rounded-full bg-(--color-accent) mb-4 " />
         <h1 className="font-serif text-3xl">Consult the report</h1>
         <p className="text-(--color-ink-dim) text-sm mt-1">
           Answers come from Gemma, using only the changes in this report. Click a

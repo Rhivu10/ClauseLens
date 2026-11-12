@@ -6,9 +6,9 @@
   --font-sans: "Space Grotesk", ui-sans-serif, system-ui, sans-serif;
   --font-mono: "IBM Plex Mono", ui-monospace, monospace;
 
-  /* "case file" base — aged paper beige, warm white, taupe rules */
-  --color-bg: #ece4d6;
-  --color-surface: #f8f5ee;
+  /* "case file" base — blush paper, warm white, taupe rules */
+  --color-bg: #faf4f3;
+  --color-surface: #fffcfa;
   --color-surface-2: #e1d8c5;
   --color-line: #c7bca4;
 
@@ -26,6 +26,9 @@
   --color-cyan: #4f5a62;
   --color-cyan-dim: #39424a;
   --color-diverge: #9c3b2b;
+
+  /* touch of wine red around the pages (top rule, current page, small marks) */
+  --color-accent: #882e3a;
 }
 
 html, body, #root { height: 100%; }
@@ -36,7 +39,7 @@ body {
   font-family: var(--font-sans);
 }
 
-::selection { background: var(--color-brass); color: var(--color-brass-ink); }
+::selection { background: var(--color-accent); color: #faf4f3; }
 
 .font-serif-text { font-family: var(--font-serif); }
 .font-mono-label { font-family: var(--font-mono); letter-spacing: 0.08em; }

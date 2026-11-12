@@ -124,6 +124,7 @@ export default function ComparePage() {
   return (
     <div className="max-w-7xl mx-auto px-6 py-10">
       <div className="max-w-4xl mx-auto text-center mb-7">
+        <span aria-hidden="true" className="block w-10 h-[3px] rounded-full bg-(--color-accent) mb-4 mx-auto" />
         <h1 className="font-serif text-3xl">
           Where the two versions agree — and where they don't
         </h1>

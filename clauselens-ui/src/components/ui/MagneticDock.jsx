@@ -88,7 +88,7 @@ function DockItem({ item, mouseX, iconSize, maxScale, magneticDistance, reducedM
             initial={reducedMotion ? false : { scale: 0, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
             exit={{ scale: 0, opacity: 0 }}
-            className="absolute -bottom-2 w-1 h-1 rounded-full bg-(--color-brass)"
+            className="absolute -bottom-2 w-1 h-1 rounded-full bg-(--color-accent)"
           />
         )}
       </AnimatePresence>
@@ -104,7 +104,7 @@ function DockItem({ item, mouseX, iconSize, maxScale, magneticDistance, reducedM
             transition={{ duration: 0.15, ease: "easeOut" }}
             className="absolute top-full mt-3.5 left-1/2 -translate-x-1/2 px-2.5 py-1 rounded-lg bg-(--color-surface) border border-(--color-line) text-(--color-ink) text-[12.5px] whitespace-nowrap shadow-lg pointer-events-none z-50"
           >
-            {item.num && <span className="font-mono text-[10px] text-(--color-brass) mr-1.5">{item.num}</span>}
+            {item.num && <span className="font-mono text-[10px] text-(--color-accent) mr-1.5">{item.num}</span>}
             {item.label}
           </motion.div>
         )}
