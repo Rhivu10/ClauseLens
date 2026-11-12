@@ -24,6 +24,9 @@ One-time setup on this laptop:
    `tdhanush24/checkpoints` (checkpoint-2091). To use another copy, set
    `CLAUSELENS_CHECKPOINT_DATASET=<owner>/<dataset>` before `npm run dev`.
 
+`npm run setup` checks all of this (Node, Python, the Kaggle tool, the token, access
+to the adapter dataset) and says what to fix.
+
 Then `npm run dev`, open **Intake**, choose the two PDFs and press **Run comparison**.
 
 What happens (`server/kaggle.js`):
