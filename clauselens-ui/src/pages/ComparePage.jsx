@@ -30,10 +30,10 @@ export function EmptyState({ status, error }) {
         <p className="font-mono text-sm text-(--color-ink-faint)">Loading the latest report…</p>
       ) : status === "running" ? (
         <>
-          <h1 className="font-serif text-3xl mb-3">Comparison running on Kaggle</h1>
+          <h1 className="font-serif text-3xl mb-3">Comparison running</h1>
           <p className="text-(--color-ink-dim) mb-8">
-            The changed clauses appear here as soon as Nodes 1–4 are done (about 4–7 minutes after
-            the start), and each impact summary as it is written. This page updates by itself.
+            The changed clauses appear here about 4–7 minutes after the start, and each impact
+            summary as it is written. This page updates by itself.
           </p>
           <Link to="/upload" className="text-sm text-(--color-brass) underline underline-offset-4">
             See the progress
