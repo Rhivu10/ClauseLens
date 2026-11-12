@@ -81,7 +81,7 @@ export default function ParsingOverlay({ job, stages, onClose, onPreview }) {
         transition={{ duration: 0.45 }}
       >
         <div className="font-mono-label text-[11px] uppercase tracking-[0.2em] text-(--color-ink-faint) mb-8">
-          {failed ? "The run stopped" : "Examining the documents on Kaggle"}
+          {failed ? "The run stopped" : "Examining the documents"}
         </div>
 
         {/* the case-file stack + magnifier */}
