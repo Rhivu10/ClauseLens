@@ -3,7 +3,15 @@
 ## Overview
 
 The `pipeline` package connects all six nodes in one **LangGraph** graph, so a full comparison is a single call
-instead of wiring the nodes by hand in every notebook:
+instead of wiring the nodes by hand. It is the one entry point of the project: the command line, the web app's
+Kaggle runner and any script use it.
+
+```bash
+python pipeline/install.py                          # once: the libraries (GPU machine)
+python -m pipeline old.pdf new.pdf --out results    # report.json, report.md, ui_data.json
+```
+
+From Python:
 
 ```python
 from pipeline import PipelineConfig, run_pipeline
@@ -116,13 +124,23 @@ for its progress bar.
 
 ## Installation
 
-LangGraph is the only new dependency (on top of the node requirements):
+All libraries (Unsloth, the pinned transformers, LangGraph, PyMuPDF, FAISS, ...) are installed by
 
 ```
-pip install langgraph
+python pipeline/install.py
 ```
 
-On Kaggle, see `notebooks/ClauseLens_LangGraph_Pipeline.py`.
+Run it as a script: importing the `pipeline` package already needs these libraries. The web app's Kaggle runner
+uses the same file, so the library list exists only there.
+
+## Live results
+
+`run_pipeline(..., on_preview=f, on_result=g)` reports the report while it fills in (`pipeline/live.py`):
+
+- `on_preview(payload)` right after Node 4: `{"ui": <Node 6 UI data with every change pending>, "done": 0, "total": n}`
+- `on_result(payload)` after each Node 5 result: `{"pair_id", "alignment", "overview", "done", "total"}`
+
+The web app uses them to show the changed clauses after Node 4 and each summary as it is written.
 
 ---
 

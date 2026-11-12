@@ -1,4 +1,7 @@
 # ============================================================================
+# FOR TESTING ONLY. The project runs from .py files: python -m pipeline (see the
+# README) or the web app (clauselens-ui), which call the same pipeline package.
+#
 # ClauseLens — full pipeline (Nodes 1-6) through the LangGraph mapping
 # Kaggle, accelerator: GPU T4 x2, internet on.
 # Add a dataset with your two PDFs. The CUAD adapter (checkpoint-2091) comes with

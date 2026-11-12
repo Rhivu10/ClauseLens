@@ -30,9 +30,11 @@ Then `npm run dev`, open **Intake**, choose the two PDFs and press **Run compari
 What happens (`server/kaggle.js`):
 
 1. The PDFs are uploaded as a new version of your private dataset `clauselens-input`.
-2. `server/kaggle/runner.py` is pushed as your private notebook `clauselens-runner`
-   (GPU T4 x2, internet on), which starts a run. It clones ClauseLens `main`
-   (including the adapter weights) and runs Nodes 1–6.
+2. `server/kaggle/runner.py` is pushed to Kaggle as your private script `clauselens-runner`
+   (a `.py` file run on a GPU T4 x2, internet on). It clones ClauseLens `main` (including
+   the adapter weights), installs the libraries with `pipeline/install.py` and calls
+   `pipeline.run_pipeline` — the same code as `python -m pipeline`. The runner itself only
+   reads the uploaded PDFs and reports progress.
 3. The page shows the stage from the notebook log. A full run takes about 7–8 minutes for a
    1-page document and ~16 minutes for a 20-page contract; the changed clauses appear after
    ~4–7 minutes and the impact summaries fill in as they are written.

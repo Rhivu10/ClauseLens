@@ -29,7 +29,11 @@ Heavy objects that hold the GPU models (aligner, extractor, agents) are created
 inside the node functions and dropped when the node returns, so the Node 3
 model can be freed before the Node 5 models are loaded.
 
-Usage:
+Live results: on_preview(payload) is called right after Node 4 with every
+changed clause (summaries pending), on_result(payload) after each Node 5 result
+(see pipeline/live.py). The web app's Kaggle runner uses them for its live page.
+
+Usage (or from a shell: python -m pipeline old.pdf new.pdf --out results/):
 
     from pipeline import PipelineConfig, run_pipeline
     cfg = PipelineConfig(checkpoint_path=".../checkpoint-2091",
@@ -43,6 +47,8 @@ from __future__ import annotations
 import os
 import re
 import time
+import types
+from collections import Counter
 from typing import Any, Callable, TypedDict
 
 from .cleanup import clean_chunks
@@ -50,6 +56,7 @@ from .config import PipelineConfig
 from .models import ModelHub
 
 StageCallback = Callable[..., None]
+PayloadCallback = Callable[[dict], None]
 
 STAGES = [
     "node_1_parse",
@@ -84,17 +91,24 @@ def build_graph(
     config: PipelineConfig,
     models: ModelHub | None = None,
     on_stage: StageCallback | None = None,
+    on_preview: PayloadCallback | None = None,
+    on_result: PayloadCallback | None = None,
 ):
     """
     The compiled LangGraph for Nodes 1-6.
 
     on_stage(name, **info) is called when a node starts (info: {}) and ends
     (info: {"seconds": ..., plus a short summary}), e.g. for a progress bar.
+    Extra stages inside nodes: node_3_loading_model, preview_ready,
+    node_5_loading_agents, node_5_warmup.
+
+    on_preview / on_result: live results, see the module docstring.
     """
     from langgraph.graph import END, START, StateGraph
 
     models = models or ModelHub(config)
     say = on_stage or (lambda name, **info: None)
+    live_box: dict[str, Any] = {}                      # the LiveReport, created after Node 4
     os.makedirs(config.output_dir, exist_ok=True)
 
     def timed(name: str, fn: Callable[[PipelineState], dict[str, Any]]):
@@ -134,6 +148,10 @@ def build_graph(
     # ------------------------------------------------------------------ Node 3
     def node_3_align(state: PipelineState) -> dict[str, Any]:
         from nodes.node_3 import GemmaVerifier, Node3Aligner
+        if models.node3_model is None:
+            say("node_3_loading_model")
+            model, tokenizer = models.node3()
+            say("node_3_align")                        # loading done: aligning now
         model, tokenizer = models.node3()
         aligner = Node3Aligner(state["all_chunks"], state["index_bundle"], state["embedding_model"],
                                GemmaVerifier(model, tokenizer, config.node3), config.node3)
@@ -148,6 +166,18 @@ def build_graph(
         out = extractor.run(state["node3_report"],
                             checkpoint_path=os.path.join(config.output_dir, "node4_pairs.jsonl"),
                             verbose=config.verbose)
+        if on_preview or on_result:
+            from nodes.node_5 import Node5ImpactCore
+            from .live import LiveReport
+            stub = types.SimpleNamespace(model=None, config=config.node5)
+            probe = Node5ImpactCore(state["all_chunks"], stub, stub, config.node5)
+            skipped = {p["pair_id"] for p in out["pairs"] if probe._is_trivial(probe.build_view(p))}
+            live = LiveReport({"document_a": config.document_names[0], "document_b": config.document_names[1]},
+                              state["all_chunks"], state["node3_report"], out["pairs"], skipped)
+            live_box["live"] = live
+            if on_preview:
+                on_preview(live.preview())
+            say("preview_ready", changes=live.total)
         return {"node4_output": out, "_info": {"counts": out["counts"]}}
 
     def after_node_4(state: PipelineState) -> str:
@@ -156,6 +186,7 @@ def build_graph(
     # ------------------------------------------------------------------ Node 5
     def node_5_impact(state: PipelineState) -> dict[str, Any]:
         from nodes.node_5 import CriticAgent, ImpactAgent, Node5ImpactCore
+        say("node_5_loading_agents")
         m = models.node5_agents()
         impact = ImpactAgent(m["impact_model"], m["impact_tokenizer"], config.node5)
         critic = CriticAgent(m["critic_model"], m["critic_tokenizer"], config.node5)
@@ -175,9 +206,28 @@ def build_graph(
                 except Exception as e:      # noqa: BLE001 — the warm-up only has to compile
                     print("warm-up:", type(e).__name__, str(e)[:200])
 
+        say("node_5_impact")                           # models ready: the summaries start now
         checkpoint = os.path.join(config.output_dir, "node5_results.jsonl")
+        live = live_box.get("live")
+
+        def run_core() -> dict[str, Any]:
+            """core.run(), but every finished result also goes to on_result."""
+            results, t0 = {}, time.time()
+            for i, r in enumerate(core.iter_run(pairs, checkpoint), 1):
+                results[r["pair_id"]] = r
+                if live is not None and on_result:
+                    payload = live.update(r)
+                    if payload:
+                        on_result(payload)
+                if config.verbose:
+                    print(f"[{i}/{len(pairs)}] {r['impact']['status']:14} {r['pair_id']} "
+                          f"| attempts {r['impact']['attempts']} | elapsed {time.time() - t0:.0f}s", flush=True)
+            ordered = [results[p["pair_id"]] for p in pairs]
+            return {"results": ordered, "counts": dict(Counter(r["impact"]["status"] for r in ordered)),
+                    "model_calls": dict(core.calls), "parallel": core.parallel, "seconds": round(time.time() - t0, 1)}
+
         try:
-            out = core.run(pairs, checkpoint_path=checkpoint, verbose=config.verbose)
+            out = run_core()
         except RuntimeError as e:
             if not core.parallel or not _COMPILE_CLASH.search(str(e)):
                 raise
@@ -185,7 +235,7 @@ def build_graph(
             # pairs are read back from the checkpoint, not redone
             print("Node 5: parallel run stopped (torch compile clash); continuing sequentially:", str(e)[:200])
             core.parallel = False
-            out = core.run(pairs, checkpoint_path=checkpoint, verbose=config.verbose)
+            out = run_core()
         return {"node5_output": out,
                 "_info": {"counts": out["counts"], "parallel": out.get("parallel")}}
 
@@ -228,7 +278,9 @@ def run_pipeline(
     config: PipelineConfig,
     on_stage: StageCallback | None = None,
     models: ModelHub | None = None,
+    on_preview: PayloadCallback | None = None,
+    on_result: PayloadCallback | None = None,
 ) -> PipelineState:
     """Run Nodes 1-6 on two PDFs (old version, new version). Returns the final state."""
-    graph = build_graph(config, models=models, on_stage=on_stage)
+    graph = build_graph(config, models=models, on_stage=on_stage, on_preview=on_preview, on_result=on_result)
     return graph.invoke({"pdf_a": pdf_a, "pdf_b": pdf_b, "timings": {}})

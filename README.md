@@ -34,17 +34,28 @@ Comparing the same two PDFs again opens the saved report at once.
 Sample PDFs to try are in [`clauselens-ui/test-documents`](clauselens-ui/test-documents)
 (Apache License 1.0 → 1.1, BSD 4-clause → 3-clause).
 
-### Run in a Kaggle notebook instead
+### Run without the web app
 
-Open [`notebooks/ClauseLens_LangGraph_Pipeline.py`](notebooks/ClauseLens_LangGraph_Pipeline.py)
-on Kaggle (accelerator **GPU T4 x2**, internet on), add a dataset with your two PDFs,
-and run the cells. It calls the same pipeline:
+On any machine with a CUDA GPU (for example a Kaggle "GPU T4 x2" session):
+
+```bash
+git clone https://github.com/Rhivu10/ClauseLens.git
+cd ClauseLens
+python pipeline/install.py
+python -m pipeline old.pdf new.pdf --out results
+```
+
+`results/` then holds `report.json`, `report.md` and `ui_data.json`. From Python:
 
 ```python
 from pipeline import PipelineConfig, run_pipeline
 state = run_pipeline("old.pdf", "new.pdf", PipelineConfig())
 state["report"]
 ```
+
+The web app runs exactly this code on Kaggle: its runner
+(`clauselens-ui/server/kaggle/runner.py`) only reads the uploaded PDFs, installs with
+`pipeline/install.py` and calls `run_pipeline`.
 
 ## How it works
 
@@ -55,7 +66,8 @@ state["report"]
 5. **Node 5** writes an impact summary per change (Gemma E4B) and a second model checks it.
 6. **Node 6** builds the report: overview, changes by section and party, evidence down to the sentence.
 
-[`pipeline/`](pipeline) connects the six nodes in one LangGraph graph.
+[`pipeline/`](pipeline) connects the six nodes in one LangGraph graph; everything runs from
+`.py` files.
 
 ## Documentation
 
@@ -70,7 +82,7 @@ state["report"]
 nodes/            Nodes 1–6
 pipeline/         LangGraph mapping of Nodes 1–6
 clauselens-ui/    web app (React + Vite) and the Kaggle runner
-notebooks/        Kaggle notebooks
+notebooks/        notebooks for testing and data handling only (the project runs from .py)
 Model Finetuning/ the CUAD adapter weights (checkpoint-2091) and its training notebook
 ```
 

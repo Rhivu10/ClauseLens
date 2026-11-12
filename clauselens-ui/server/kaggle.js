@@ -48,7 +48,8 @@ const REPO_BRANCH = process.env.CLAUSELENS_REPO_BRANCH || "main";
 const CHECKPOINT_DATASET = process.env.CLAUSELENS_CHECKPOINT_DATASET || null;
 const POLL_MS = Number(process.env.CLAUSELENS_POLL_MS) || 30_000;
 
-// Pipeline stages written by runner.py, in order, with what the UI shows
+// Stages, in order, with what the UI shows: the pipeline's stages (pipeline/graph.py)
+// plus the Kaggle steps around them
 export const STAGES = [
   ["uploading", "Uploading the PDFs to Kaggle"],
   ["dataset_processing", "Kaggle is preparing the upload"],
@@ -56,11 +57,11 @@ export const STAGES = [
   ["queued", "Waiting for a free Kaggle GPU"],
   ["started", "Notebook started"],
   ["installing", "Installing libraries"],
-  ["loading_models", "Loading Gemma + CUAD adapter"],
-  ["node_1_2_parsing", "Node 1–2 · reading and indexing both PDFs"],
-  ["node_1_2_done", "Node 1–2 · done"],
-  ["node_3_alignment", "Node 3 · aligning clauses"],
-  ["node_4_duties", "Node 4 · checking duties (shall / may / must not)"],
+  ["node_1_parse", "Node 1 · reading both PDFs"],
+  ["node_2_index", "Node 2 · indexing every clause"],
+  ["node_3_loading_model", "Loading Gemma + CUAD adapter"],
+  ["node_3_align", "Node 3 · aligning clauses"],
+  ["node_4_deontic", "Node 4 · checking duties (shall / may / must not)"],
   ["preview_ready", "Changes found · impact summaries in progress"],
   ["node_5_loading_agents", "Node 5 · loading the Impact and Critic agents"],
   ["node_5_warmup", "Node 5 · warming up both models"],
