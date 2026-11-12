@@ -233,23 +233,6 @@ A failed check counts as HALLUCINATION, with the problem as the warning for the 
 | `min_chars` | `40` | Below this (without the heading line) a pair is SKIPPED |
 | `parallel` | `True` | Agents on separate threads/GPUs; off automatically if they share a model |
 | `cleanup_every` | `10` | Empty the CUDA cache every N generations per agent |
-| `impact_batch_size` | `8` | Pairs per Impact Agent `model.generate` call (1 = one pair at a time, the original loop) |
-| `critic_batch_size` | `8` | Pairs per Critic `model.generate` call |
-| `oom_split` | `True` | On CUDA out-of-memory, split the batch in half and retry (down to one pair) |
-
-### Batched rounds
-
-With batch sizes above 1, Node 5 works in rounds: every pair still waiting goes through the Impact Agent in
-batches (input order, left padding, each row the same prompt as the one-pair path); each finished batch goes
-straight to the Critic on the other GPU while the next batch is written. Retries (HALLUCINATION, MISSING_CONTEXT)
-form the next round. The grounding checks, verdicts, retries and `max_attempts` are unchanged, and the batches don't
-depend on thread timing.
-
-Checked on CPU with the real Echo–Ferndale pairs (72) and a scripted model: results identical to the one-pair loop
-for every pair (all routes: VERIFIED, HALLUCINATION, MISSING_CONTEXT, unreadable Critic answers, second attempts),
-also with batch size 1 and with simulated out-of-memory splits; `model.generate` calls 196 → 37. With the real
-Gemma 4 processor: padding with `processor.tokenizer` (the processor has no `pad()`), each padded row identical to
-the one-pair prompt.
 
 ---
 

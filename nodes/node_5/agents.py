@@ -9,11 +9,6 @@ Impact Agent and Critic Agent.
 Agents may share one tokenizer. Hugging Face fast tokenizers are not safe
 to call from two threads at once ("Already borrowed"), so every tokenizer
 call goes through one lock. Generation itself runs in parallel.
-
-Batching: generate_many() / write_many() / check_many() put several pairs into
-one model.generate call (left padding). Each row gets exactly the prompt the
-one-pair methods would build. A batch that runs out of GPU memory is split in
-half and retried, down to single pairs.
 """
 
 from __future__ import annotations
@@ -35,14 +30,6 @@ from .prompts import (
 from .config import UNKNOWN
 
 _TOKENIZER_LOCK = threading.Lock()
-
-
-def _text_tokenizer(tokenizer):
-    """
-    The plain text tokenizer. For Gemma 4, Unsloth returns a Gemma4Processor,
-    which wraps the tokenizer and has no pad() (same as Node 3 / Node 4).
-    """
-    return getattr(tokenizer, "tokenizer", None) or tokenizer
 
 
 # ============================================================
@@ -189,94 +176,6 @@ class GemmaAgent:
             if self._calls % self.config.cleanup_every == 0:
                 self._empty_cache()
 
-    # ------------------------------------------------------------
-    # BATCHED GENERATION
-    # ------------------------------------------------------------
-
-    def _encode_ids(self, prompt: str) -> list[int]:
-        """Chat-template token ids as a plain list (for padding into a batch)."""
-        messages = [{"role": "user", "content": [{"type": "text", "text": prompt}]}]
-        with _TOKENIZER_LOCK:
-            enc = self.tokenizer.apply_chat_template(
-                messages,
-                tokenize=True,
-                add_generation_prompt=True,
-                return_dict=True,
-            )
-        ids = enc["input_ids"]
-        if hasattr(ids, "tolist"):
-            ids = ids.tolist()
-        if ids and isinstance(ids[0], list):
-            ids = ids[0]
-        return ids
-
-    def generate_many(
-        self,
-        prompts_for_limit: list[Callable[[int], str]],
-        max_new_tokens: int,
-        **kwargs,
-    ) -> list[str]:
-        """
-        generate() for several prompts in one model.generate call. Each prompt
-        shrinks to the token budget exactly as in generate(). Returns the raw
-        answers in input order.
-        """
-        if not prompts_for_limit:
-            return []
-        budget = self.config.max_seq_length - max_new_tokens - 16
-        encoded = []
-        for prompt_for_limit in prompts_for_limit:
-            limit = self.config.text_chars
-            for _ in range(6):
-                ids = self._encode_ids(prompt_for_limit(limit))
-                if len(ids) <= budget:
-                    break
-                limit = int(limit * 0.75)
-            encoded.append(ids)
-        return self._generate_encoded(encoded, max_new_tokens, **kwargs)
-
-    def _generate_encoded(self, encoded: list[list[int]], max_new_tokens: int, **kwargs) -> list[str]:
-        inputs = outputs = None
-        try:
-            with _TOKENIZER_LOCK:
-                tok = _text_tokenizer(self.tokenizer)
-                old_side, old_pad = getattr(tok, "padding_side", "right"), getattr(tok, "pad_token", None)
-                tok.padding_side = "left"
-                if tok.pad_token is None:
-                    tok.pad_token = tok.eos_token
-                try:
-                    batch = tok.pad({"input_ids": encoded, "attention_mask": [[1] * len(e) for e in encoded]},
-                                    padding=True, return_tensors="pt")
-                finally:
-                    tok.padding_side = old_side
-                    if old_pad is None:
-                        tok.pad_token = None
-            prompt_len = int(batch["input_ids"].shape[-1])
-            inputs = {k: v.to(self.model.device) for k, v in batch.items()}
-            with torch.no_grad():
-                outputs = self.model.generate(
-                    **inputs,
-                    max_new_tokens=max_new_tokens,
-                    do_sample=False,
-                    repetition_penalty=kwargs.get("repetition_penalty", self.config.repetition_penalty),
-                )
-            with _TOKENIZER_LOCK:
-                return [self.tokenizer.decode(outputs[i][prompt_len:], skip_special_tokens=True).strip()
-                        for i in range(len(encoded))]
-        except torch.cuda.OutOfMemoryError:
-            inputs = outputs = None
-            self._empty_cache()
-            if len(encoded) > 1 and self.config.oom_split:
-                mid = len(encoded) // 2
-                return (self._generate_encoded(encoded[:mid], max_new_tokens, **kwargs)
-                        + self._generate_encoded(encoded[mid:], max_new_tokens, **kwargs))
-            return [""] * len(encoded)          # like generate(): an empty answer on OOM
-        finally:
-            del inputs, outputs
-            self._calls += 1
-            if self._calls % self.config.cleanup_every == 0:
-                self._empty_cache()
-
     def _empty_cache(self):
         gc.collect()
         device = getattr(self.model, "device", None)
@@ -298,14 +197,6 @@ class ImpactAgent(GemmaAgent):
         raw = self.generate(lambda limit: build_impact_prompt(view, limit, warning),
                             self.config.impact_max_new_tokens)
         return {**parse_impact(raw), "raw": raw}
-
-    def write_many(self, views: list[dict[str, Any]], warnings: list[str | None]) -> list[dict[str, Any]]:
-        """write() for several pairs in one batch."""
-        raws = self.generate_many(
-            [(lambda limit, v=v, w=w: build_impact_prompt(v, limit, w)) for v, w in zip(views, warnings)],
-            self.config.impact_max_new_tokens,
-        )
-        return [{**parse_impact(raw), "raw": raw} for raw in raws]
 
 
 # ============================================================
@@ -330,29 +221,3 @@ class CriticAgent(GemmaAgent):
             result["retried"] = True
             result.setdefault("raw", raw2[:200])
         return result
-
-    def check_many(
-        self,
-        views: list[dict[str, Any]],
-        summaries: list[str],
-        double_checks: list[list[str] | None],
-    ) -> list[dict[str, str]]:
-        """check() for several pairs in one batch; unreadable answers are retried together."""
-        raws = self.generate_many(
-            [(lambda limit, v=v, s=s, d=d: build_critic_prompt(v, s, limit, d))
-             for v, s, d in zip(views, summaries, double_checks)],
-            self.config.critic_max_new_tokens,
-        )
-        results = [parse_critic(raw) for raw in raws]
-        again = [i for i, r in enumerate(results) if r["verdict"] == UNKNOWN]
-        if again:
-            raws2 = self.generate_many(
-                [(lambda limit, v=views[i], s=summaries[i]: build_critic_retry_prompt(v, s, limit)) for i in again],
-                8, repetition_penalty=1.3,
-            )
-            for i, raw2 in zip(again, raws2):
-                result = parse_critic(raw2)
-                result["retried"] = True
-                result.setdefault("raw", raw2[:200])
-                results[i] = result
-        return results
