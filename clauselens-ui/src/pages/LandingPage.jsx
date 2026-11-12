@@ -3,6 +3,7 @@ import DocumentLensScan from "@/components/DocumentLensScan";
 import { Button } from "@/components/ui/Button";
 import { CanvasText } from "@/components/ui/CanvasText";
 import { LinkPreview } from "@/components/ui/LinkPreview";
+import { LetterCascade } from "@/components/ui/LetterCascade";
 
 export default function LandingPage() {
   return (
@@ -11,9 +12,9 @@ export default function LandingPage() {
       <div className="relative z-10 w-full max-w-7xl mx-auto px-6">
         <div className="max-w-2xl">
           <h1 className="font-sans font-semibold text-5xl md:text-6xl leading-[1.05] tracking-tight mb-6 [text-shadow:0_2px_18px_rgba(41,36,29,0.22)]">
-            Read two versions
+            <LetterCascade text="Read two versions" />
             <br />
-            of a policy{" "}
+            <LetterCascade text="of a policy" />{" "}
             <CanvasText
               text="at once"
               color="var(--color-cyan)"
