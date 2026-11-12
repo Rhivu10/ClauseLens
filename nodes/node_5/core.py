@@ -47,7 +47,7 @@ from .config import (
     STATUS_SKIPPED,
 )
 from .grounding import check_summary, unsupported_words
-from .ontology import detect_categories, find_parties, stakeholders_for
+from .ontology import detect_categories, find_parties, party_is_grounded, stakeholders_for
 from nodes.node_4.patterns import split_sentences
 
 
@@ -178,6 +178,7 @@ class Node5ImpactCore:
         view = self.build_view(job["pair"], job["context_level"])
         out = self.impact_agent.write(view, job.get("warning"))
         self.calls["impact"] += 1
+        out["affected"] = _drop_hint_only_parties(out["affected"], view)
         job["view"] = view
         job["draft"] = out
         job["issues"] = check_summary(out["summary"], out["affected"], view,
@@ -375,6 +376,20 @@ class Node5ImpactCore:
 # ============================================================
 # HELPERS
 # ============================================================
+
+def _drop_hint_only_parties(affected: list[str], view: dict[str, Any]) -> list[str]:
+    """
+    AFFECTED names that are only stakeholder hints (e.g. "Customer" from the
+    category ontology) and appear neither in the text nor among the contract's
+    parties are removed, not rejected: the summary is unchanged and no retry is
+    spent. Apache License 1.1 (Kaggle, 12 Nov 2026) listed "Customer" for a
+    warranty disclaimer that names no customer. Generic "Both parties" stays.
+    """
+    text = " ".join(t for t in (view.get("source_text"), view.get("target_text"),
+                                view.get("context_text"), view.get("heading")) if t)
+    named = list(view.get("parties", [])) + list(view.get("contract_parties", []))
+    return [a for a in affected if party_is_grounded(a, text, named)]
+
 
 def _grounding_text(view: dict[str, Any]) -> str:
     """The same text the grounding checks compare against."""
