@@ -1,5 +1,5 @@
 """
-ClauseLens — Node 4
+ClauseLens — Node 4 (performance-tuned)
 Deontic cue extractor.
 
     NODE 3 report (align_documents)
@@ -12,8 +12,13 @@ Deontic cue extractor.
                       |
                       +----> enriched pair ----> checkpoint (JSONL) ----> NODE 5
 
-Pairs are processed one at a time and each result is appended to the
-checkpoint file immediately, so a crashed session resumes where it stopped.
+Performance-tuned iter_run(): pairs are processed in windows of
+config.prefetch_pairs. Before a window's pairs are enriched, every sentence
+any of them will ask the model is batch-classified once
+(DeonticChecker.classify_many), so the per-pair path runs entirely on warm
+cache entries and makes no generate calls of its own. Yield order, checkpoint
+format and every output field are unchanged; with prefetch_pairs=1 the loop
+behaves exactly like the original one-pair-at-a-time version.
 """
 
 from __future__ import annotations
@@ -25,7 +30,7 @@ import time
 from collections import Counter
 from typing import Any, Iterator
 
-from .checker import DeonticChecker
+from .checker import DeonticChecker, deontic_cache_key
 from .config import (
     Node4Config,
     NODE4_VERSION,
@@ -180,6 +185,36 @@ class Node4Extractor:
         }
 
     # ============================================================
+    # WINDOW PREFETCH (batched classification)
+    # ============================================================
+
+    def _prefetch(self, window_pairs: list[dict[str, Any]]) -> None:
+        """
+        Batch-classify every sentence the window's pairs will ask the model,
+        so enrich_pair() below finds warm cache entries and makes no generate
+        calls of its own. Uses the same tag_text() and _needs_model() decisions
+        as profile(), and the same cache keys as classify(), so the warmed
+        entries are exactly the ones the per-pair path looks up.
+        """
+        if self.checker is None or self.config.model_check == "off":
+            return
+
+        items, seen = [], set()
+        for pair in window_pairs:
+            for cid in (pair["source_chunk_id"], pair["target_chunk_id"]):
+                if not cid:
+                    continue
+                for s in tag_text(self.chunk_by_id[cid]["text"]):
+                    if self._needs_model(s):
+                        allowed = {c["label"] for c in s["cues"]}
+                        key = deontic_cache_key(s["text"], allowed)
+                        if key not in seen:
+                            seen.add(key)
+                            items.append((s["text"], allowed))
+        if items:
+            self.checker.classify_many(items)
+
+    # ============================================================
     # CONTINUOUS PROCESSING
     # ============================================================
 
@@ -194,6 +229,11 @@ class Node4Extractor:
         With checkpoint_path, every finished pair is appended to a JSONL file.
         On restart, pairs already in the file are yielded from disk instead of
         being processed again.
+
+        Pairs still to process are handled in windows of
+        config.prefetch_pairs: each window's model-needed sentences are
+        batch-classified up front (see _prefetch). Yield order is the
+        report's pair order, exactly as before.
         """
         pairs = self.pairs_from_node3(report)
         fingerprint = self._fingerprint(pairs)
@@ -211,10 +251,23 @@ class Node4Extractor:
                 fh.write("\n")      # close a partial line left by a crash
 
         try:
+            # Pending pairs, grouped into prefetch windows (report order).
+            window = max(1, int(getattr(self.config, "prefetch_pairs", 1)))
+            pending = [p for p in pairs if p["pair_id"] not in done]
+            window_of: dict[str, list[dict[str, Any]]] = {}
+            for i in range(0, len(pending), window):
+                for p in pending[i:i + window]:
+                    window_of[p["pair_id"]] = pending[i:i + window]
+            prefetched: set[str] = set()
+
             for pair in pairs:
-                if pair["pair_id"] in done:
-                    yield done[pair["pair_id"]]
+                pid = pair["pair_id"]
+                if pid in done:
+                    yield done[pid]
                     continue
+                if pid not in prefetched:
+                    self._prefetch(window_of[pid])
+                    prefetched.update(q["pair_id"] for q in window_of[pid])
                 enriched = self.enrich_pair(pair)
                 if fh:
                     fh.write(json.dumps(enriched, ensure_ascii=False) + "\n")
@@ -357,4 +410,4 @@ def read_node4_output(path: str) -> list[dict[str, Any]]:
                 continue
             if "_meta" not in row:
                 rows.append(row)
-    return rows
+        return rows
