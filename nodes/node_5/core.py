@@ -22,6 +22,13 @@ Parallel multi-agent core and routing.
 
 The two agents run on separate threads: while the Critic checks pair 1 on
 GPU 1, the Impact Agent already writes pair 2 on GPU 0.
+
+Batched rounds (impact_batch_size / critic_batch_size > 1): every pair still
+waiting goes through the Impact Agent in batches (input order); each finished
+batch goes straight to the Critic on the other GPU while the next batch is
+written. Retries form the next round. The routing (checks, verdicts, retries,
+max_attempts) is the same as for one pair at a time, and batches don't depend
+on thread timing, so a run is repeatable.
 """
 
 from __future__ import annotations
@@ -176,7 +183,10 @@ class Node5ImpactCore:
 
     def _impact_step(self, job: dict[str, Any]) -> dict[str, Any]:
         view = self.build_view(job["pair"], job["context_level"])
-        out = self.impact_agent.write(view, job.get("warning"))
+        self._after_impact(job, view, self.impact_agent.write(view, job.get("warning")))
+        return job
+
+    def _after_impact(self, job: dict[str, Any], view: dict[str, Any], out: dict[str, Any]) -> None:
         self.calls["impact"] += 1
         job["view"] = view
         job["draft"] = out
@@ -188,12 +198,26 @@ class Node5ImpactCore:
             words = unsupported_words(out["summary"], _grounding_text(view))
             if len(words) > self.config.review_unsupported_words:
                 job["double_check"] = words
-        return job
 
     def _critic_step(self, job: dict[str, Any]) -> dict[str, Any]:
         job["critic"] = self.critic_agent.check(job["view"], job["draft"]["summary"], job.get("double_check"))
         self.calls["critic"] += 1
         return job
+
+    def _impact_batch(self, jobs: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        views = [self.build_view(j["pair"], j["context_level"]) for j in jobs]
+        outs = self.impact_agent.write_many(views, [j.get("warning") for j in jobs])
+        for job, view, out in zip(jobs, views, outs):
+            self._after_impact(job, view, out)
+        return jobs
+
+    def _critic_batch(self, jobs: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        checks = self.critic_agent.check_many([j["view"] for j in jobs], [j["draft"]["summary"] for j in jobs],
+                                              [j.get("double_check") for j in jobs])
+        for job, check in zip(jobs, checks):
+            job["critic"] = check
+            self.calls["critic"] += 1
+        return jobs
 
     # ============================================================
     # ROUTING
@@ -306,6 +330,10 @@ class Node5ImpactCore:
                     continue
                 queue.append(job)
 
+            if max(self.config.impact_batch_size, self.config.critic_batch_size) > 1:
+                yield from self._batched_rounds(list(queue), impact_ex, critic_ex, emit)
+                return
+
             # Keep the Impact GPU busy with one job queued ahead; the Critic works in parallel
             def feed():
                 while queue and sum(1 for s, _ in inflight.values() if s == "impact") < 2:
@@ -334,6 +362,41 @@ class Node5ImpactCore:
                 critic_ex.shutdown(wait=True, cancel_futures=True)
             if fh:
                 fh.close()
+
+    def _batched_rounds(self, jobs, impact_ex, critic_ex, emit) -> Iterator[dict[str, Any]]:
+        """
+        Rounds of batched generation (see the module docstring). Impact batch k+1
+        is written on GPU 0 while the Critic checks batch k on GPU 1.
+        """
+        order = {id(j): i for i, j in enumerate(jobs)}
+        b_imp = max(1, self.config.impact_batch_size)
+        b_crit = max(1, self.config.critic_batch_size)
+        pending = jobs
+        while pending:
+            batches = [pending[i:i + b_imp] for i in range(0, len(pending), b_imp)]
+            retry, critic_futs = [], []
+            impact_fut = impact_ex.submit(self._impact_batch, batches[0])
+            for k in range(len(batches)):
+                written = impact_fut.result()                  # re-raise worker errors
+                if k + 1 < len(batches):
+                    impact_fut = impact_ex.submit(self._impact_batch, batches[k + 1])
+                to_check = [j for j in written if not j["issues"]]
+                for i in range(0, len(to_check), b_crit):
+                    part = to_check[i:i + b_crit]
+                    critic_futs.append(critic_ex.submit(self._critic_batch, part))
+                for job in written:                            # rejected by the checks: no Critic
+                    if job["issues"]:
+                        if self._route(job) == "retry":
+                            retry.append(job)
+                        else:
+                            yield emit(self._result(job))
+            for fut in critic_futs:
+                for job in fut.result():
+                    if self._route(job) == "retry":
+                        retry.append(job)
+                    else:
+                        yield emit(self._result(job))
+            pending = sorted(retry, key=lambda j: order[id(j)])
 
     def run(
         self,

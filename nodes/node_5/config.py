@@ -32,7 +32,7 @@ STATUS_SKIPPED = "SKIPPED"                # too little text to analyse (e.g. a h
 
 
 # Bump when Node 5 logic or prompts change; checkpoints from older versions are redone
-NODE5_VERSION = "6"
+NODE5_VERSION = "7"
 
 
 # ============================================================
@@ -80,3 +80,13 @@ class Node5Config:
 
     # Empty the CUDA cache every N generations per agent
     cleanup_every: int = 10
+
+    # -------------------- batching (performance) --------------------
+
+    # Pairs per model.generate call for the Impact Agent / the Critic. Each pair
+    # gets the same prompt as before; 1 = the original one-pair-at-a-time loop.
+    impact_batch_size: int = 8
+    critic_batch_size: int = 8
+
+    # On CUDA out-of-memory, split the batch in half and retry (down to one pair)
+    oom_split: bool = True
