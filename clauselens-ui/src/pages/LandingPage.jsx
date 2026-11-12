@@ -1,6 +1,6 @@
 import { Link } from "react-router-dom";
 import DocumentLensScan from "@/components/DocumentLensScan";
-import MagneticButton from "@/components/MagneticButton";
+import { HoverBorderGradient } from "@/components/ui/HoverBorderGradient";
 import { CanvasText } from "@/components/ui/CanvasText";
 
 export default function LandingPage() {
@@ -34,9 +34,9 @@ export default function LandingPage() {
             clause — so you see exactly what changed, and can ask why.
           </p>
           <div className="flex items-center gap-5">
-            <Link to="/upload">
-              <MagneticButton>Start a comparison</MagneticButton>
-            </Link>
+            <HoverBorderGradient as={Link} to="/upload">
+              Start a comparison
+            </HoverBorderGradient>
             <a
               href="https://github.com/Rhivu10/ClauseLens"
               target="_blank"
