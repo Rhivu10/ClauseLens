@@ -1,71 +1,52 @@
-// Lamp: a thin bar of light that widens as it comes into view and casts two soft
-// beams and a glow onto what is below it. Adapted from Aceternity UI's lamp for a
-// light page: the beams fade out with masks (the original hides them behind dark
-// panels), and the light is the page accent.
+// Lamp: a thin bar of light that widens as it comes into view and pours a soft
+// pool of light below it (and a faint halo above). Adapted from Aceternity UI's
+// lamp for a light page: the light is drawn with radial gradients instead of
+// beams hidden behind dark panels. Default colour: warm lamp gold.
 import { motion } from "framer-motion";
 
-const GROW = { delay: 0.2, duration: 0.8, ease: "easeInOut" };
+const GROW = { delay: 0.2, duration: 0.9, ease: "easeInOut" };
 
-export function Lamp({ children, color = "136, 46, 58", width = 26, className = "" }) {
+export function Lamp({ children, color = "214, 150, 52", width = 30, className = "" }) {
   const rgb = (a) => `rgba(${color}, ${a})`;
-  // beams fade out away from the bar (from its centre, at the top inner corner)
-  const fadeFrom = (x) => `radial-gradient(ellipse 100% 100% at ${x} 0%, black 25%, transparent 75%)`;
+  const inView = { viewport: { once: true }, transition: GROW };
 
   return (
-    <div className={`relative isolate flex flex-col items-center ${className}`}>
-      <div className="pointer-events-none absolute inset-x-0 top-0 h-56 flex justify-center overflow-hidden" aria-hidden="true">
-        {/* left and right beams, from the bar down and outwards */}
+    <div className={`relative isolate flex flex-col items-center pt-14 ${className}`}>
+      <div className="pointer-events-none absolute inset-x-0 top-0 flex justify-center" aria-hidden="true">
+        {/* faint halo above the bar */}
         <motion.div
-          initial={{ opacity: 0.4, width: `${width / 2}rem` }}
-          whileInView={{ opacity: 1, width: `${width}rem` }}
-          viewport={{ once: true }}
-          transition={GROW}
-          className="absolute top-0 right-1/2 h-48"
+          initial={{ width: `${width * 0.6}rem`, opacity: 0.4 }}
+          whileInView={{ width: `${width * 1.4}rem`, opacity: 1 }}
+          {...inView}
+          className="absolute top-0 h-14 max-w-[100vw]"
+          style={{ background: `radial-gradient(ellipse 50% 100% at 50% 100%, ${rgb(0.22)} 0%, transparent 75%)` }}
+        />
+        {/* the pool of light under the bar: brightest at its middle, fading down and out */}
+        <motion.div
+          initial={{ width: `${width * 0.5}rem`, opacity: 0.5 }}
+          whileInView={{ width: `${width * 1.15}rem`, opacity: 1 }}
+          {...inView}
+          className="absolute top-14 h-48 max-w-[100vw] blur-md"
           style={{
-            backgroundImage: `conic-gradient(from 180deg at 100% 0%, transparent 0deg, ${rgb(0.3)} 75deg, transparent 90deg)`,
-            maskImage: fadeFrom("100%"),
-            WebkitMaskImage: fadeFrom("100%"),
+            background: `radial-gradient(ellipse 50% 100% at 50% 0%, ${rgb(0.55)} 0%, ${rgb(0.32)} 30%, ${rgb(0.1)} 60%, transparent 80%)`,
           }}
         />
+        {/* the bar */}
         <motion.div
-          initial={{ opacity: 0.4, width: `${width / 2}rem` }}
-          whileInView={{ opacity: 1, width: `${width}rem` }}
-          viewport={{ once: true }}
-          transition={GROW}
-          className="absolute top-0 left-1/2 h-48"
-          style={{
-            backgroundImage: `conic-gradient(from 90deg at 0% 0%, transparent 0deg, ${rgb(0.3)} 15deg, transparent 90deg)`,
-            maskImage: fadeFrom("0%"),
-            WebkitMaskImage: fadeFrom("0%"),
-          }}
-        />
-        {/* glow just under the bar */}
-        <motion.div
-          initial={{ width: "8rem", opacity: 0.5 }}
-          whileInView={{ width: "18rem", opacity: 1 }}
-          viewport={{ once: true }}
-          transition={GROW}
-          className="absolute top-0 h-24 -translate-y-1/2 rounded-full blur-2xl"
-          style={{ background: rgb(0.35) }}
+          initial={{ width: `${width * 0.4}rem` }}
+          whileInView={{ width: `${width}rem` }}
+          {...inView}
+          className="absolute top-14 h-[2px] max-w-[90vw] rounded-full"
+          style={{ background: `rgb(${color})`, boxShadow: `0 0 10px ${rgb(0.9)}, 0 0 24px ${rgb(0.5)}` }}
         />
       </div>
 
-      {/* the bar itself */}
       <motion.div
-        initial={{ width: "2.5rem" }}
-        whileInView={{ width: `${width}rem` }}
-        viewport={{ once: true }}
-        transition={GROW}
-        className="relative z-10 h-[3px] max-w-full rounded-full"
-        style={{ background: `linear-gradient(to right, transparent, ${rgb(1)} 15%, ${rgb(1)} 85%, transparent)`, boxShadow: `0 0 12px ${rgb(0.6)}` }}
-      />
-
-      <motion.div
-        initial={{ opacity: 0.6, y: 12 }}
+        initial={{ opacity: 0.6, y: 14 }}
         whileInView={{ opacity: 1, y: 0 }}
         viewport={{ once: true }}
-        transition={{ ...GROW, delay: 0.3 }}
-        className="relative z-10 w-full pt-6"
+        transition={{ ...GROW, delay: 0.35 }}
+        className="relative z-10 w-full pt-14"
       >
         {children}
       </motion.div>
