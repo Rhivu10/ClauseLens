@@ -14,14 +14,14 @@ const VARIANTS = {
   solid: {
     inner: "bg-(--color-brass) text-(--color-brass-ink)",
     fill: "var(--color-brass)",
-    glow: "232, 197, 144",          // light gold travelling over the brass edge
-    highlight: "#e8c590",
+    glow: "240, 214, 208",          // light blush travelling over the dark edge
+    highlight: "#f0d6d0",
   },
   soft: {
     inner: "bg-(--color-surface) text-(--color-ink)",
     fill: "var(--color-surface)",
-    glow: "106, 69, 38",            // brass travelling over the paper edge
-    highlight: "#6a4526",
+    glow: "58, 31, 31",            // dark wine brown travelling over the paper edge
+    highlight: "#3a1f1f",
   },
 };
 

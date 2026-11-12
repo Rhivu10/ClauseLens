@@ -231,7 +231,7 @@ export default function DocumentLensScan({ className = "" }) {
             y: "-50%",
             width: R * 4.4,
             height: R * 4.4,
-            background: "radial-gradient(circle, rgba(106,69,38,0.20) 0%, transparent 62%)",
+            background: "radial-gradient(circle, rgba(58,31,31,0.20) 0%, transparent 62%)",
           }}
         />
       )}

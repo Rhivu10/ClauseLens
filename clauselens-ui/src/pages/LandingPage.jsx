@@ -17,12 +17,12 @@ export default function LandingPage() {
               text="at once"
               color="var(--color-cyan)"
               colors={[
-                "rgba(106, 69, 38, 0.95)",
-                "rgba(106, 69, 38, 0.8)",
-                "rgba(106, 69, 38, 0.65)",
-                "rgba(106, 69, 38, 0.5)",
-                "rgba(106, 69, 38, 0.35)",
-                "rgba(106, 69, 38, 0.2)",
+                "rgba(58, 31, 31, 0.95)",
+                "rgba(58, 31, 31, 0.8)",
+                "rgba(58, 31, 31, 0.65)",
+                "rgba(58, 31, 31, 0.5)",
+                "rgba(58, 31, 31, 0.35)",
+                "rgba(58, 31, 31, 0.2)",
               ]}
               lineGap={4}
               animationDuration={20}
