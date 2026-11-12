@@ -2,6 +2,7 @@ import { Link } from "react-router-dom";
 import DocumentLensScan from "@/components/DocumentLensScan";
 import { Button } from "@/components/ui/Button";
 import { CanvasText } from "@/components/ui/CanvasText";
+import { LinkPreview } from "@/components/ui/LinkPreview";
 
 export default function LandingPage() {
   return (
@@ -37,14 +38,15 @@ export default function LandingPage() {
             <Button as={Link} to="/upload">
               Start a comparison
             </Button>
-            <a
-              href="https://github.com/Rhivu10/ClauseLens"
+            <LinkPreview
+              url="https://github.com/Rhivu10/ClauseLens"
+              imageSrc="/github-preview.png"
               target="_blank"
               rel="noreferrer"
               className="text-sm text-(--color-ink-dim) underline underline-offset-4 hover:text-(--color-ink)"
             >
               View the repo
-            </a>
+            </LinkPreview>
           </div>
         </div>
       </div>
