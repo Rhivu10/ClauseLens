@@ -1,41 +1,31 @@
 import { STATUS_LABEL, STATUS_COLOR } from "./rows";
 import HighlightedText from "./HighlightedText";
 
-// The alignment view drawn as an open legal book: left page = document A, right
-// page = document B, meeting at a shaded central spine. The book has visible stacked page
-// edges; each clause pair's match status is a sticky note poking out of the
-// nearest fore-edge, and the drift note is an editor's footnote in the gutter.
+// The alignment view drawn as an open book (a photo, public/book.png): left page =
+// document A, right page = document B, meeting at the spine. Each clause pair's
+// match status is a sticky note poking out of the nearest fore-edge, and the
+// impact summary is an editor's footnote across the gutter.
 
-const SPINE =
-  "linear-gradient(90deg, transparent 0%, rgba(41,36,29,0.04) 40%, rgba(41,36,29,0.13) 50%, rgba(41,36,29,0.04) 60%, transparent 100%)";
-
-const PAGE_EDGE =
-  "repeating-linear-gradient(180deg, var(--color-surface) 0 2px, color-mix(in srgb, var(--color-line) 65%, transparent) 2px 3.5px)";
+// Slices of public/book.png (625 x 476): cover + page stack on each side (equal, so
+// the spine stays in the middle), page tops and bottoms. The middle stretches.
+const BOOK = { top: 14, side: 40, bottom: 18 };
 
 export default function SideBySideDiff({ documents, rows, highlight }) {
   return (
     <div className="relative mx-auto max-w-4xl my-2">
-      {/* stacked sheets peeking behind — thickness */}
-      <div className="absolute inset-0 translate-x-[6px] translate-y-[8px] rounded-lg bg-(--color-surface-2) border border-(--color-line)" />
-      <div className="absolute inset-0 translate-x-[3px] translate-y-[4px] rounded-lg bg-(--color-surface) border border-(--color-line)" />
-
-      {/* book cover */}
-      <div className="relative rounded-lg bg-(--color-surface-2) p-2 border border-(--color-line) shadow-[0_34px_80px_-32px_rgba(41,36,29,0.45)]">
-        {/* fore-edge page striping */}
-        <div className="absolute top-3 bottom-3 -left-[3px] w-[5px] rounded-l-sm" style={{ background: PAGE_EDGE }} />
-        <div className="absolute top-3 bottom-3 -right-[3px] w-[5px] rounded-r-sm" style={{ background: PAGE_EDGE }} />
-
-        {/* the open spread */}
-        <div className="relative rounded-[3px] bg-(--color-surface) border border-(--color-line)">
-          {/* central spine */}
-          <div
-            className="absolute inset-y-0 left-1/2 -translate-x-1/2 w-[64px] pointer-events-none"
-            style={{ background: SPINE }}
-          />
-          <div className="absolute inset-y-0 left-1/2 w-px bg-(--color-ink)/20 pointer-events-none" />
-
+      {/* the open book (public/book.png): a 9-slice frame, so the page edges, cover
+          and spine stay sharp while the book grows to fit every clause */}
+      <div
+        className="relative drop-shadow-[0_30px_40px_rgba(41,36,29,0.22)]"
+        style={{
+          borderStyle: "solid",
+          borderWidth: `${BOOK.top}px ${BOOK.side}px ${BOOK.bottom}px`,
+          borderImage: `url(/book.png) ${BOOK.top} ${BOOK.side} ${BOOK.bottom} fill / ${BOOK.top}px ${BOOK.side}px ${BOOK.bottom}px stretch`,
+        }}
+      >
+        <div className="relative">
           {/* running heads */}
-          <div className="grid grid-cols-2 border-b border-(--color-line) font-mono text-[10px] uppercase tracking-[0.2em] text-(--color-ink-faint)">
+          <div className="grid grid-cols-2 border-b border-(--color-ink)/10 font-mono text-[10px] uppercase tracking-[0.2em] text-(--color-ink-faint)">
             <div className="pl-10 pr-16 py-3.5 truncate">{documents.document_a.label}</div>
             <div className="pl-16 pr-10 py-3.5 text-right truncate">{documents.document_b.label}</div>
           </div>
@@ -48,7 +38,7 @@ export default function SideBySideDiff({ documents, rows, highlight }) {
               <section
                 key={row.id}
                 id={`change-${row.change_id}`}
-                className={`relative grid grid-cols-2 border-t border-(--color-line) first-of-type:border-t-0 scroll-mt-24 transition-colors duration-700 ${
+                className={`relative grid grid-cols-2 border-t border-(--color-ink)/10 first-of-type:border-t-0 scroll-mt-24 transition-colors duration-700 ${
                   highlight && highlight === row.change_id ? "bg-(--color-brass)/10" : ""
                 }`}
               >
