@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import SideBySideDiff from "./compare/SideBySideDiff";
 import { useLiveReport } from "@/lib/api";
@@ -67,8 +67,21 @@ const DOWNLOADS = [
 
 function DownloadReport() {
   const [open, setOpen] = useState(false);
+  const box = useRef(null);
+  // stays open until a format is picked, a click lands outside it, or Esc is pressed
+  useEffect(() => {
+    if (!open) return;
+    const away = (e) => !box.current?.contains(e.target) && setOpen(false);
+    const esc = (e) => e.key === "Escape" && setOpen(false);
+    document.addEventListener("mousedown", away);
+    document.addEventListener("keydown", esc);
+    return () => {
+      document.removeEventListener("mousedown", away);
+      document.removeEventListener("keydown", esc);
+    };
+  }, [open]);
   return (
-    <div className="relative mt-4 inline-block" onMouseLeave={() => setOpen(false)}>
+    <div ref={box} className="relative mt-4 inline-block">
       <Button onClick={() => setOpen((o) => !o)} aria-expanded={open}>
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
           <path d="M12 3v12m0 0l-5-5m5 5l5-5M4 19h16" />
