@@ -14,6 +14,7 @@ import { motion, useAnimationFrame, useMotionValue, useTransform, animate } from
 
 const R = 46; // lens radius, px
 const GLASS = Math.round(R * 0.885); // the see-through part inside the brass rim
+const MAG = 1.6;                      // how much the glass magnifies
 const LOOP_SECONDS = 34;
 const READ = 0.92; // fraction of the loop spent reading (rest = glide back to top)
 
@@ -67,7 +68,7 @@ const PAPER = { aspect: 1079 / 1457, left: "22%", right: "9%", top: "36.5%" };
 
 function Sheet({ sharp, bodyRef }) {
   const ink = sharp ? "var(--color-ink)" : "var(--color-ink-dim)";
-  const hide = { opacity: sharp ? 0 : 1 };
+  const hide = {};
   return (
     <div className="absolute inset-0" style={{ paddingLeft: PAPER.left, paddingRight: PAPER.right, paddingTop: PAPER.top }}>
       <div className="h-full">
@@ -94,7 +95,7 @@ function Sheet({ sharp, bodyRef }) {
           style={{ color: ink }}
         >
           {BODY_BEFORE}
-          <span className="rounded-[3px] px-0.5 font-semibold" style={{ background: sharp ? "transparent" : "rgba(136,46,58,0.2)" }}>
+          <span className="rounded-[3px] px-0.5 font-semibold" style={{ background: "rgba(136,46,58,0.2)" }}>
             {BODY_MARK}
           </span>
           {BODY_AFTER}
@@ -206,14 +207,12 @@ export default function DocumentLensScan({ className = "" }) {
     setHeld(false);
   }
 
-  const mask = useTransform(
-    [x, y],
-    ([lx, ly]) => {
-      const sx = lx - offRef.current.x;
-      const sy = ly - offRef.current.y;
-      return `radial-gradient(circle ${R * 1.2}px at ${sx}px ${sy}px, #000 ${R * 0.5}px, rgba(0,0,0,0.45) ${R * 0.78}px, transparent ${R * 0.98}px)`;
-    }
+  // The magnified view: a sharp copy of the document, scaled up around the lens
+  // centre and clipped to the glass (the clip is scaled too, so its radius is /MAG)
+  const clipPath = useTransform([x, y], ([lx, ly]) =>
+    `circle(${(GLASS - 1) / MAG}px at ${lx - offRef.current.x}px ${ly - offRef.current.y}px)`
   );
+  const origin = useTransform([x, y], ([lx, ly]) => `${lx - offRef.current.x}px ${ly - offRef.current.y}px`);
   const sharpOpacity = useTransform(lift, (l) => 1 - l * 0.8);
   const lensScale = useTransform(lift, (l) => 1 + l * 0.5);
   const lensOpacity = useTransform(lift, (l) => 1 - l * 0.55);
@@ -223,12 +222,12 @@ export default function DocumentLensScan({ className = "" }) {
       <div
         ref={wrapRef}
         aria-hidden="true"
-        className="absolute top-1/2 -translate-y-1/2 left-[52%] right-[5%] max-w-[500px]"
+        className="absolute top-1/2 -translate-y-1/2 left-[54%] right-[6%] max-w-[400px]"
       >
         {/* the document: the folder picture, with soft blurred ghost text on it */}
         <div
           className="relative bg-contain bg-no-repeat bg-center drop-shadow-[0_28px_40px_rgba(41,36,29,0.3)]"
-          style={{ aspectRatio: PAPER.aspect, backgroundImage: "url(/policy-folder.webp)" }}
+          style={{ aspectRatio: PAPER.aspect, backgroundImage: "url(/policy-folder.webp)", opacity: 0.86 }}
         />
         <div className="absolute inset-0" style={{ filter: "blur(2px)", opacity: 0.85 }}>
           <Sheet bodyRef={bodyEl} />
@@ -237,8 +236,8 @@ export default function DocumentLensScan({ className = "" }) {
         {/* sharp copy of the text, revealed only under the glass */}
         {ready && (
           <motion.div
-            className="absolute inset-0"
-            style={{ maskImage: mask, WebkitMaskImage: mask, opacity: sharpOpacity }}
+            className="absolute inset-0 bg-contain bg-no-repeat bg-center"
+            style={{ clipPath, WebkitClipPath: clipPath, transformOrigin: origin, scale: MAG, opacity: sharpOpacity, backgroundImage: "url(/policy-folder.webp)" }}
           >
             <Sheet sharp />
           </motion.div>

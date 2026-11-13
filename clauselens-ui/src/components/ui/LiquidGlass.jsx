@@ -1,7 +1,7 @@
 // Liquid glass: bends whatever is behind the element through an SVG displacement
 // filter used as backdrop-filter (Snell's-law refraction, chromatic aberration,
 // specular rim). Adapted from Aceternity UI's liquid-glass to plain JSX.
-// Chromium refracts; Safari, Firefox and reduced-transparency get frosted glass.
+// Chromium refracts; elsewhere (Safari, Firefox, reduced transparency) it stays clear.
 import { useEffect, useId, useRef, useState } from "react";
 
 
@@ -111,16 +111,16 @@ export function LiquidGlass({
     mode === "opaque"
       ? "none"
       : mode === "simple"
-        ? "blur(20px) saturate(1.4)"
+        ? "none"                       // no refraction here: keep the glass clear
         : filter
           ? `url(#${filter.id}) blur(0.5px) saturate(1.85) brightness(1.02)`
-          : "blur(10px) saturate(1.6) brightness(1.04)";
+          : "none";
 
   return (
     <div
       ref={rootRef}
       data-refract={mode === "pending" && filter ? "true" : "false"}
-      className={`relative overflow-hidden ${mode === "simple" ? "bg-white/40" : ""} ${mode === "opaque" ? "bg-(--color-surface)" : ""} ${className}`}
+      className={`relative overflow-hidden   ${className}`}
       style={{
         borderRadius: radius,
         backgroundColor:
