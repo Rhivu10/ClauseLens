@@ -2,6 +2,7 @@ import { Fragment, useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { askConsult, getConsult, useReport } from "@/lib/api";
 import CitationChip from "@/components/CitationChip";
+import { Button } from "@/components/ui/Button";
 import { EmptyState } from "@/pages/ComparePage";
 
 // Ask about the latest report. Gemma (pipeline/consult.py) answers on Kaggle, using
@@ -132,6 +133,7 @@ export default function ConsultPage() {
   return (
     <div className="max-w-3xl mx-auto px-6 py-8 flex flex-col h-[calc(100vh-4rem)]">
       <div className="mb-5">
+        <span aria-hidden="true" className="block w-10 h-[3px] rounded-full bg-(--color-accent) mb-4 " />
         <h1 className="font-serif text-3xl">Consult the report</h1>
         <p className="text-(--color-ink-dim) text-sm mt-1">
           Answers come from Gemma, using only the changes in this report. Click a
@@ -228,10 +230,11 @@ export default function ConsultPage() {
             placeholder="Ask about the changes…"
             className="flex-1 bg-transparent outline-none font-serif-text text-[15px] placeholder:text-(--color-ink-faint)"
           />
-          <button
+          <Button
             type="submit"
             disabled={!input.trim()}
-            className="w-9 h-9 rounded-full bg-(--color-brass) text-(--color-brass-ink) flex items-center justify-center hover:opacity-90 disabled:opacity-30 disabled:cursor-not-allowed shrink-0"
+            containerClassName="shrink-0 !p-1"
+            className="!p-0 w-9 h-9"
             aria-label="Send"
           >
             <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
@@ -243,7 +246,7 @@ export default function ConsultPage() {
                 strokeLinejoin="round"
               />
             </svg>
-          </button>
+          </Button>
         </form>
       </div>
     </div>

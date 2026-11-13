@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import Magnifier from "@/components/Magnifier";
+import { Button } from "@/components/ui/Button";
 import { motion, AnimatePresence } from "framer-motion";
 
 // Shown while a comparison runs on Kaggle: a "detective going through the case
@@ -80,7 +81,7 @@ export default function ParsingOverlay({ job, stages, onClose, onPreview }) {
         transition={{ duration: 0.45 }}
       >
         <div className="font-mono-label text-[11px] uppercase tracking-[0.2em] text-(--color-ink-faint) mb-8">
-          {failed ? "The run stopped" : "Examining the documents on Kaggle"}
+          {failed ? "The run stopped" : "Examining the documents"}
         </div>
 
         {/* the case-file stack + magnifier */}
@@ -123,12 +124,9 @@ export default function ParsingOverlay({ job, stages, onClose, onPreview }) {
             <>
               <p className="font-mono text-[13px] text-(--color-diverge) mb-2 whitespace-pre-wrap break-words">{job.error}</p>
               <div className="flex items-center gap-4 mt-4">
-                <button
-                  onClick={onClose}
-                  className="px-4 py-2 rounded-full bg-(--color-surface-2) border border-(--color-line) text-sm font-medium hover:border-(--color-brass)"
-                >
+                <Button variant="soft" onClick={onClose}>
                   Back to upload
-                </button>
+                </Button>
                 {job.kernel_url && (
                   <a href={job.kernel_url} target="_blank" rel="noreferrer" className="text-sm text-(--color-brass) underline underline-offset-4">
                     Open the notebook log on Kaggle
@@ -169,13 +167,10 @@ export default function ParsingOverlay({ job, stages, onClose, onPreview }) {
                 )}
               </div>
               {job?.preview_ready && onPreview && (
-                <button
-                  onClick={onPreview}
-                  className="mt-5 w-full px-4 py-2.5 rounded-full bg-(--color-brass) text-(--color-brass-ink) text-sm font-medium hover:opacity-90"
-                >
+                <Button onClick={onPreview} containerClassName="mt-5 !w-full" className="w-full">
                   See the changes found so far
                   {job.progress ? ` · ${job.progress.done} of ${job.progress.total} summaries ready` : ""} →
-                </button>
+                </Button>
               )}
               <p className="mt-4 text-[12px] text-(--color-ink-faint)">
                 You can close this tab — the run keeps going on Kaggle, and the report opens here when you come back.

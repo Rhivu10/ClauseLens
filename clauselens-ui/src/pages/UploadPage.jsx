@@ -1,72 +1,38 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { getJob, getSetup, startJob } from "@/lib/api";
-import MagneticButton from "@/components/MagneticButton";
+import { Button } from "@/components/ui/Button";
 import ParsingOverlay from "@/components/ParsingOverlay";
+import { Dropzone, DropzoneContent, DropzoneEmptyState } from "@/components/ui/Dropzone";
 
+const PDF = { "application/pdf": [".pdf"] };
+const MAX_PDF = 50 * 1024 * 1024;
+
+// One document: a label, then a dropzone that takes one PDF
 function Slot({ file, onFile, label }) {
-  const inputRef = useRef(null);
-  const [dragging, setDragging] = useState(false);
-
+  const [error, setError] = useState(null);
   return (
-    <div
-      onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
-      onDragLeave={() => setDragging(false)}
-      onDrop={(e) => {
-        e.preventDefault();
-        setDragging(false);
-        const f = e.dataTransfer.files?.[0];
-        if (f && f.type === "application/pdf") onFile(f);
-      }}
-      className={`relative flex-1 min-h-[320px] rounded-2xl border transition-colors
-        ${dragging ? "border-(--color-cyan) bg-(--color-cyan)/5" : "border-(--color-line) bg-(--color-surface)"}`}
-    >
-      <input
-        ref={inputRef}
-        type="file"
-        accept="application/pdf"
-        className="hidden"
-        onChange={(e) => e.target.files?.[0] && onFile(e.target.files[0])}
-      />
-      <div className="absolute top-4 left-4 font-mono text-[11px] uppercase tracking-[0.14em] text-(--color-ink-faint)">
-        {label}
-      </div>
-      <div className="h-full flex flex-col items-center justify-center gap-3 p-8 text-center">
-        {file ? (
-          <>
-            <div className="w-14 h-18 rounded-sm bg-(--color-surface-2) border border-(--color-line) flex items-center justify-center">
-              <span className="font-mono text-[10px] text-(--color-ink-faint)">PDF</span>
-            </div>
-            <div className="font-serif-text text-lg">{file.name}</div>
-            <div className="font-mono text-xs text-(--color-ink-faint)">
-              {(file.size / 1024).toFixed(0)} KB · ready to compare
-            </div>
-            <button
-              onClick={() => inputRef.current.click()}
-              className="mt-2 text-sm text-(--color-brass) underline underline-offset-4"
-            >
-              Replace file
-            </button>
-          </>
-        ) : (
-          <>
-            <svg width="40" height="40" viewBox="0 0 40 40" aria-hidden="true">
-              <circle cx="17" cy="17" r="12" fill="none" stroke="var(--color-ink-faint)" strokeWidth="2" />
-              <line x1="25.5" y1="25.5" x2="35" y2="35" stroke="var(--color-ink-faint)" strokeWidth="2.4" strokeLinecap="round" />
-            </svg>
-            <div className="text-sm text-(--color-ink-faint) max-w-[24ch]">
-              Choose a PDF from your device to place it on the table
-            </div>
-            <button
-              onClick={() => inputRef.current.click()}
-              className="mt-3 px-4 py-2 rounded-full bg-(--color-surface-2) border border-(--color-line) text-sm font-medium hover:border-(--color-brass) transition-colors"
-            >
-              Choose file
-            </button>
-          </>
-        )}
-      </div>
+    <div className="flex-1 flex flex-col gap-2">
+      <div className="font-mono text-[11px] uppercase tracking-[0.14em] text-(--color-ink-faint)">{label}</div>
+      <Dropzone
+        accept={PDF}
+        maxFiles={1}
+        maxSize={MAX_PDF}
+        src={file ? [file] : undefined}
+        onDrop={(files) => {
+          setError(null);
+          onFile(files[0]);
+        }}
+        onError={(e) =>
+          setError(/type/i.test(e.message) ? "That isn't a PDF. Choose a .pdf file." : /larger|too large/i.test(e.message) ? "That PDF is over 50 MB." : e.message)
+        }
+        className="min-h-[260px]"
+      >
+        <DropzoneEmptyState />
+        <DropzoneContent />
+      </Dropzone>
+      {error && <p className="text-[13px] text-(--color-diverge)">{error}</p>}
     </div>
   );
 }
@@ -133,6 +99,7 @@ export default function UploadPage() {
         transition={{ duration: 0.4 }}
         className="max-w-2xl mb-10"
       >
+        <span aria-hidden="true" className="block w-10 h-[3px] rounded-full bg-(--color-accent) mb-4 " />
         <h1 className="font-sans font-semibold text-4xl leading-tight mb-3">
           Place two versions of the same contract on the table.
         </h1>
@@ -160,13 +127,9 @@ export default function UploadPage() {
       </div>
 
       <div className="mt-8 flex items-center gap-5">
-        <MagneticButton
-          disabled={!ready}
-          onClick={handleRun}
-          className="disabled:opacity-30 disabled:cursor-not-allowed"
-        >
+        <Button disabled={!ready} onClick={handleRun}>
           {sending ? "Sending to Kaggle…" : "Run comparison"}
-        </MagneticButton>
+        </Button>
         <Link
           to="/compare"
           className="text-sm text-(--color-ink-dim) underline underline-offset-4 hover:text-(--color-ink)"

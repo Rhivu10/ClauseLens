@@ -1,13 +1,19 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import Magnifier from "@/components/Magnifier";
-import { motion, useMotionValue, useTransform, animate } from "framer-motion";
+import { LiquidGlass } from "@/components/ui/LiquidGlass";
+import { motion, useAnimationFrame, useMotionValue, useTransform, animate } from "framer-motion";
 
 // Ambient hero animation: a magnifier lens reads the app's introduction the way
 // an eye does — travelling word by word along each justified line of a document
 // sheet, then dropping to the next. Text under the glass is sharp; everything
 // else is a soft blurred ghost.
+//
+// Click the glass to pick it up: it stops reading and can be dragged anywhere on
+// the page, bending whatever is behind it (liquid glass); double-click lets it
+// read again (the lens's tooltip says so).
 
 const R = 46; // lens radius, px
+const GLASS = Math.round(R * 0.885); // the see-through part inside the brass rim
 const LOOP_SECONDS = 34;
 const READ = 0.92; // fraction of the loop spent reading (rest = glide back to top)
 
@@ -78,19 +84,31 @@ function Sheet({ sharp, bodyRef }) {
 }
 
 export default function DocumentLensScan({ className = "" }) {
+  const rootRef = useRef(null);
   const wrapRef = useRef(null);
   const bodyEl = useRef(null);
   const geomRef = useRef(null);
+  const offRef = useRef({ x: 0, y: 0 });     // the sheet's top-left inside the root
+  const dragRef = useRef(null);               // {dx, dy} from the pointer to the lens centre while dragging
   const [ready, setReady] = useState(false);
+  const [held, setHeld] = useState(false);    // picked up: stays put until dragged, double-click lets it read again
+  const [dragging, setDragging] = useState(false);
+  const heldRef = useRef(false);
 
-  const progress = useMotionValue(0);
+  // the lens centre in root coordinates, and how far it is lifted off the page (0 = reading)
+  const x = useMotionValue(-200);
+  const y = useMotionValue(-200);
+  const lift = useMotionValue(0);
 
   useLayoutEffect(() => {
     function measure() {
+      const root = rootRef.current;
       const wrap = wrapRef.current;
       const body = bodyEl.current;
-      if (!wrap || !body) return;
+      if (!root || !wrap || !body) return;
+      const rr = root.getBoundingClientRect();
       const wr = wrap.getBoundingClientRect();
+      offRef.current = { x: wr.left - rr.left, y: wr.top - rr.top };
 
       // one rect per rendered (justified) line of the paragraph
       const range = document.createRange();
@@ -121,32 +139,69 @@ export default function DocumentLensScan({ className = "" }) {
     };
   }, []);
 
-  useEffect(() => {
-    const controls = animate(progress, 1, {
-      duration: LOOP_SECONDS,
-      ease: "linear",
-      repeat: Infinity,
-    });
-    return () => controls.stop();
-  }, [progress]);
+  // Reading: every frame the loop moves the lens along the lines; picked up, it pauses
+  const elapsed = useRef(0);
+  useAnimationFrame((_, delta) => {
+    if (heldRef.current || !geomRef.current) return;
+    elapsed.current += Math.min(delta, 100) / 1000;
+    const r = readingPos((elapsed.current / LOOP_SECONDS) % 1, geomRef.current);
+    x.set(r.x + offRef.current.x);
+    y.set(r.y + offRef.current.y);
+    lift.set(r.lift);
+  });
 
-  const cx = useTransform(progress, (p) => readingPos(p, geomRef.current).x);
-  const cy = useTransform(progress, (p) => readingPos(p, geomRef.current).y);
-  const lift = useTransform(progress, (p) => readingPos(p, geomRef.current).lift);
+  function moveTo(clientX, clientY) {
+    const rr = rootRef.current.getBoundingClientRect();
+    const d = dragRef.current || { dx: 0, dy: 0 };
+    x.set(Math.min(rr.width - R, Math.max(R, clientX - rr.left + d.dx)));
+    y.set(Math.min(rr.height - R, Math.max(R, clientY - rr.top + d.dy)));
+  }
+
+  function onPointerDown(e) {
+    e.preventDefault();
+    e.currentTarget.setPointerCapture(e.pointerId);
+    const rr = rootRef.current.getBoundingClientRect();
+    dragRef.current = { dx: x.get() - (e.clientX - rr.left), dy: y.get() - (e.clientY - rr.top) };
+    if (!heldRef.current) {
+      heldRef.current = true;
+      setHeld(true);
+      animate(lift, 0, { duration: 0.2 });
+    }
+    setDragging(true);
+  }
+
+  function onPointerMove(e) {
+    if (dragging) moveTo(e.clientX, e.clientY);
+  }
+
+  function onPointerUp() {
+    dragRef.current = null;
+    setDragging(false);
+  }
+
+  // Double-click: put it back on the page to read from where the loop left off
+  function release() {
+    heldRef.current = false;
+    setHeld(false);
+  }
 
   const mask = useTransform(
-    [cx, cy],
-    ([x, y]) =>
-      `radial-gradient(circle ${R * 1.2}px at ${x}px ${y}px, #000 ${R * 0.5}px, rgba(0,0,0,0.45) ${R * 0.78}px, transparent ${R * 0.98}px)`
+    [x, y],
+    ([lx, ly]) => {
+      const sx = lx - offRef.current.x;
+      const sy = ly - offRef.current.y;
+      return `radial-gradient(circle ${R * 1.2}px at ${sx}px ${sy}px, #000 ${R * 0.5}px, rgba(0,0,0,0.45) ${R * 0.78}px, transparent ${R * 0.98}px)`;
+    }
   );
   const sharpOpacity = useTransform(lift, (l) => 1 - l * 0.8);
   const lensScale = useTransform(lift, (l) => 1 + l * 0.5);
   const lensOpacity = useTransform(lift, (l) => 1 - l * 0.55);
 
   return (
-    <div className={`overflow-hidden pointer-events-none ${className}`} aria-hidden="true">
+    <div ref={rootRef} className={`overflow-hidden pointer-events-none ${className}`}>
       <div
         ref={wrapRef}
+        aria-hidden="true"
         className="absolute top-1/2 -translate-y-1/2 left-[50%] right-[6%] max-w-[460px]"
       >
         {/* the document sheet — soft blurred ghost text */}
@@ -163,51 +218,69 @@ export default function DocumentLensScan({ className = "" }) {
             <Sheet sharp />
           </motion.div>
         )}
-
-        {/* warm glow riding with the lens */}
-        {ready && (
-          <motion.div
-            className="absolute rounded-full"
-            style={{
-              left: cx,
-              top: cy,
-              x: "-50%",
-              y: "-50%",
-              width: R * 4.4,
-              height: R * 4.4,
-              background: "radial-gradient(circle, rgba(106,69,38,0.20) 0%, transparent 62%)",
-            }}
-          />
-        )}
-
-        {/* the lens */}
-        {ready && (
-          <motion.div
-            className="absolute"
-            style={{
-              left: cx,
-              top: cy,
-              x: "-50%",
-              y: "-50%",
-              width: R * 2,
-              height: R * 2,
-              scale: lensScale,
-              opacity: lensOpacity,
-            }}
-          >
-            <Magnifier cx={R} cy={R} r={R} shadow="0 8px 20px rgba(41,36,29,0.3)" />
-          </motion.div>
-        )}
       </div>
 
-      {/* left scrim so the headline stays readable */}
-      <div
-        className="absolute inset-0"
-        style={{
-          background:
-            "linear-gradient(90deg, var(--color-bg) 0%, color-mix(in srgb, var(--color-bg) 82%, transparent) 26%, transparent 46%)",
-        }}
-      />
+      {/* warm glow riding with the lens */}
+      {ready && (
+        <motion.div
+          className="absolute rounded-full"
+          style={{
+            left: x,
+            top: y,
+            x: "-50%",
+            y: "-50%",
+            width: R * 4.4,
+            height: R * 4.4,
+            background: "radial-gradient(circle, rgba(58,31,31,0.20) 0%, transparent 62%)",
+          }}
+        />
+      )}
+
+      {/* the lens: click to pick it up, drag it anywhere; while held its glass bends the page behind it */}
+      {ready && (
+        <motion.div
+          role="button"
+          tabIndex={-1}
+          title={held ? "Drag the glass · double-click to let it read again" : "Pick up the magnifying glass"}
+          onPointerDown={onPointerDown}
+          onPointerMove={onPointerMove}
+          onPointerUp={onPointerUp}
+          onPointerCancel={onPointerUp}
+          onDoubleClick={release}
+          className={`absolute z-20 pointer-events-auto touch-none select-none ${dragging ? "cursor-grabbing" : "cursor-grab"}`}
+          style={{
+            left: x,
+            top: y,
+            x: "-50%",
+            y: "-50%",
+            width: R * 2,
+            height: R * 2,
+            scale: lensScale,
+            opacity: lensOpacity,
+          }}
+        >
+          <motion.div
+            className="relative w-full h-full"
+            animate={{ scale: dragging ? 1.06 : 1 }}
+            transition={{ type: "spring", stiffness: 300, damping: 22 }}
+          >
+          {held && (
+            <LiquidGlass
+              radius={GLASS}
+              scale={26}
+              aberration={8}
+              bevelDepth={18}
+              frost={0.3}
+              tint={0.06}
+              className="absolute"
+              style={{ left: R - GLASS, top: R - GLASS, width: GLASS * 2, height: GLASS * 2 }}
+            />
+          )}
+            <Magnifier cx={R} cy={R} r={R} shadow="0 8px 20px rgba(41,36,29,0.3)" />
+          </motion.div>
+        </motion.div>
+      )}
+
     </div>
   );
 }

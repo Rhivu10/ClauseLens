@@ -2,7 +2,8 @@ import { useEffect, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import SideBySideDiff from "./compare/SideBySideDiff";
 import { useLiveReport } from "@/lib/api";
-import MagneticButton from "@/components/MagneticButton";
+import { Button } from "@/components/ui/Button";
+import { Lamp } from "@/components/ui/Lamp";
 
 function Legend({ swatch, label }) {
   return (
@@ -29,10 +30,10 @@ export function EmptyState({ status, error }) {
         <p className="font-mono text-sm text-(--color-ink-faint)">Loading the latest report…</p>
       ) : status === "running" ? (
         <>
-          <h1 className="font-serif text-3xl mb-3">Comparison running on Kaggle</h1>
+          <h1 className="font-serif text-3xl mb-3">Comparison running</h1>
           <p className="text-(--color-ink-dim) mb-8">
-            The changed clauses appear here as soon as Nodes 1–4 are done (about 4–7 minutes after
-            the start), and each impact summary as it is written. This page updates by itself.
+            The changed clauses appear here about 4–7 minutes after the start, and each impact
+            summary as it is written. This page updates by itself.
           </p>
           <Link to="/upload" className="text-sm text-(--color-brass) underline underline-offset-4">
             See the progress
@@ -48,10 +49,49 @@ export function EmptyState({ status, error }) {
               ? error
               : "Upload two versions of a contract. ClauseLens runs the models on Kaggle and the results appear here."}
           </p>
-          <Link to="/upload">
-            <MagneticButton>Upload two PDFs</MagneticButton>
-          </Link>
+          <Button as={Link} to="/upload" containerClassName="mx-auto">
+            Upload two PDFs
+          </Button>
         </>
+      )}
+    </div>
+  );
+}
+
+// Download the final report: PDF (a print page), Markdown or JSON
+const DOWNLOADS = [
+  ["pdf", "PDF", "Opens a print view: choose \"Save as PDF\""],
+  ["md", "Markdown", "report.md: the readable report"],
+  ["json", "JSON", "report.json: every field, for other tools"],
+];
+
+function DownloadReport() {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="relative mt-4 inline-block" onMouseLeave={() => setOpen(false)}>
+      <Button onClick={() => setOpen((o) => !o)} aria-expanded={open}>
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+          <path d="M12 3v12m0 0l-5-5m5 5l5-5M4 19h16" />
+        </svg>
+        Download the report
+      </Button>
+      {open && (
+        <div className="absolute z-20 left-1/2 -translate-x-1/2 mt-2 w-64 rounded-xl border border-(--color-line) bg-(--color-surface) shadow-lg p-1.5 text-left">
+          {DOWNLOADS.map(([format, label, hint]) => (
+            <a
+              key={format}
+              href={`/api/report/download?format=${format}`}
+              target={format === "pdf" ? "_blank" : undefined}
+              rel="noreferrer"
+              download={format === "pdf" ? undefined : ""}
+              onClick={() => setOpen(false)}
+              className="block rounded-lg px-3 py-2 hover:bg-(--color-surface-2)"
+            >
+              <div className="text-sm font-medium">{label}</div>
+              <div className="text-[12px] text-(--color-ink-faint)">{hint}</div>
+            </a>
+          ))}
+        </div>
       )}
     </div>
   );
@@ -85,9 +125,11 @@ export default function ComparePage() {
   return (
     <div className="max-w-7xl mx-auto px-6 py-10">
       <div className="max-w-4xl mx-auto text-center mb-7">
-        <h1 className="font-serif text-3xl">
-          Where the two versions agree — and where they don't
-        </h1>
+        <Lamp>
+          <h1 className="font-serif text-3xl">
+            Where the two versions agree — and where they don't
+          </h1>
+        </Lamp>
         {live ? (
           <div className="mt-3 inline-flex items-center gap-2 rounded-full border border-(--color-brass)/40 bg-(--color-surface) px-4 py-1.5 text-sm">
             <span className="w-1.5 h-1.5 rounded-full bg-(--color-brass) animate-pulse" />
@@ -104,6 +146,7 @@ export default function ComparePage() {
             {new Date(data.run.finished_at).toLocaleString()}. Tick "Run again on Kaggle" on the upload page for a fresh run.
           </p>
         )}
+        {!live && <DownloadReport />}
         <div className="mt-3 flex items-center justify-center gap-5 text-xs font-mono text-(--color-ink-dim)">
           <Legend swatch="var(--color-diverge)" label="removed in B" />
           <Legend swatch="var(--color-cyan)" label="added in B" />
