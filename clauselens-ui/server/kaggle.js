@@ -170,6 +170,18 @@ export function currentJob() {
   return job;
 }
 
+// This server session: the Alignment and Consult pages stay empty after the server
+// starts until a comparison is opened (uploaded, or a saved report reused), so an
+// old report or chat is never shown by itself. Saved reports and answers stay on
+// disk for the cache. Kept on globalThis so a dev-server reload of this module
+// (after a code change) does not reset it.
+const SESSION = (globalThis.__clauselensSession ??= { active: false, asked: {} });
+
+function openSession() {
+  SESSION.active = true;
+  SESSION.asked = {};      // a new comparison starts a new conversation
+}
+
 // The report as it fills in during a run (null when no run is showing one)
 export function partialReport() {
   const p = readJSON(PARTIAL_FILE);
@@ -177,6 +189,7 @@ export function partialReport() {
 }
 
 export function latestReport() {
+  if (!SESSION.active) return null;
   const data = readJSON(path.join(LATEST, "ui_data.json"));
   return data && { ...data, run: readJSON(path.join(LATEST, "run.json")) };
 }
@@ -189,7 +202,7 @@ export function latestReport() {
 export function reportDownload(format) {
   const md = path.join(LATEST, "report.md");
   const json = path.join(LATEST, "report.json");
-  if (!fs.existsSync(md) || !fs.existsSync(json)) return null;
+  if (!SESSION.active || !fs.existsSync(md) || !fs.existsSync(json)) return null;
   const docs = readJSON(json)?.documents || {};
   const names = [docs.document_a?.name, docs.document_b?.name].filter(Boolean);
   const base = `ClauseLens report - ${names.join(" vs ") || "latest"}`.replace(/[\\/:*?"<>|]+/g, "_");
@@ -304,6 +317,7 @@ export async function startJob(files, { force = false } = {}) {
   const key = cacheKey(files, commit);
   const saved = path.join(CACHE, key);
   const meta = readJSON(path.join(saved, "run.json"));
+  openSession();
   if (!force && meta && fs.existsSync(path.join(saved, "ui_data.json"))) {
     useCached(saved, files);
     writeJSON(path.join(LATEST, "run.json"), { ...meta, cached: true, opened_at: new Date().toISOString() });
@@ -580,10 +594,11 @@ async function finish(kernel, id, failed = false) {
 
 const norm = (q) => q.trim().toLowerCase().replace(/\s+/g, " ").replace(/[?.!]+$/, "");
 
-// The report questions are about: the latest one (its file content identifies it)
+// The report questions are about, identified by its changes (not the file bytes:
+// reopening a saved report renames the documents and rewrites the file)
 function reportId() {
-  const f = path.join(LATEST, "report.json");
-  return fs.existsSync(f) ? sha256(fs.readFileSync(f)).slice(0, 16) : null;
+  const report = readJSON(path.join(LATEST, "report.json"));
+  return report ? sha256(JSON.stringify(report.changes ?? report)).slice(0, 16) : null;
 }
 
 function consultFile(rid) {
@@ -611,18 +626,29 @@ function saveAnswers(rid, answers, progress) {
 
 // State for the Consult page: saved answers, questions waiting, the running batch
 export function consultState() {
-  const rid = reportId();
+  const rid = SESSION.active ? reportId() : null;
   if (!rid) return { report_id: null, answers: [], queued: [], asking: [], job: null };
   const store = loadConsult(rid);
+  // the conversation shows only questions asked since this comparison was opened;
+  // older answers stay saved, so asking one again is answered at once
+  const asked = new Set(SESSION.asked[rid] || []);
+  const mine = (q) => asked.has(norm(q));
   const running = job?.type === "consult" && job.report_id === rid && job.state === "running";
-  return { report_id: rid, ...store, asking: running ? store.asking : [], job: job?.type === "consult" ? job : null };
+  return {
+    report_id: rid,
+    answers: store.answers.filter((a) => mine(a.question)),
+    queued: store.queued.filter(mine),
+    asking: running ? store.asking.filter(mine) : [],
+    job: job?.type === "consult" ? job : null,
+  };
 }
 
 // Ask questions about the latest report. Answered ones come back at once; the rest
 // start a Kaggle batch, or wait for the next one if a batch is running.
 export async function askQuestions(questions) {
-  const rid = reportId();
+  const rid = SESSION.active ? reportId() : null;
   if (!rid) throw new Error("There is no report yet. Run a comparison first.");
+  SESSION.asked[rid] = [...new Set([...(SESSION.asked[rid] || []), ...questions.map((q) => norm(String(q))).filter(Boolean)])];
   const busy = job && !["done", "error"].includes(job.state);
   if (busy && job.type !== "consult") throw new Error("A comparison is running. Ask again when it's done.");
   const store = loadConsult(rid);
@@ -699,6 +725,7 @@ async function finishConsult(kernel, id, failed) {
 // After a dev-server restart, keep following a run that was still going
 export function resume() {
   if (!job || job.state !== "running") return;
+  SESSION.active = true;
   const pushed = STAGES.findIndex((s) => s[0] === job.stage) >= STAGES.findIndex((s) => s[0] === "queued");
   if (pushed) {
     getUsername()
