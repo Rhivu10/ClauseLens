@@ -78,20 +78,20 @@ function Sheet({ sharp, bodyRef }) {
         <div className="float-right clear-right h-full" style={{ width: "25%" }} />
 
         <div className="text-center" style={hide}>
-          <div className="font-serif font-semibold text-[12px] md:text-[13.5px] tracking-[0.02em] uppercase whitespace-nowrap text-(--color-ink)">
+          <div className="font-serif font-semibold text-[3.1cqw] tracking-[0.02em] uppercase whitespace-nowrap text-(--color-ink)">
             {TITLE}
           </div>
-          <div className="mt-1 font-serif-text text-[11.5px] md:text-[12.5px] text-(--color-ink-dim)">
+          <div className="mt-1 font-serif-text text-[3.1cqw] text-(--color-ink-dim)">
             Version 2.0 | ClauseLens
           </div>
           <div className="mt-3 h-px bg-(--color-ink)/60" />
         </div>
-        <div className="mt-3 mb-1 font-serif font-semibold text-[14px] md:text-[15.5px] text-(--color-ink)" style={hide}>
+        <div className="mt-3 mb-1 font-serif font-semibold text-[3.85cqw] text-(--color-ink)" style={hide}>
           Clause 1: How it reads
         </div>
         <p
           ref={bodyRef}
-          className="font-serif-text text-[12px] md:text-[13px] leading-[1.6] text-left"
+          className="font-serif-text text-[3.25cqw] leading-[1.6] text-left"
           style={{ color: ink }}
         >
           {BODY_BEFORE}
@@ -222,7 +222,7 @@ export default function DocumentLensScan({ className = "" }) {
       <div
         ref={wrapRef}
         aria-hidden="true"
-        className="absolute top-1/2 -translate-y-1/2 left-[54%] right-[6%] max-w-[400px]"
+        className="@container absolute top-1/2 -translate-y-1/2 left-[56%] right-[7%] max-w-[350px]"
       >
         {/* the document: the folder picture, with soft blurred ghost text on it */}
         <div
