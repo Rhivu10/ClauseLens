@@ -18,8 +18,11 @@ const LOOP_SECONDS = 34;
 const READ = 0.92; // fraction of the loop spent reading (rest = glide back to top)
 
 const TITLE = "How ClauseLens reads a contract";
-const BODY =
-  "ClauseLens reads two versions of the same contract at once — the prior draft and the redline — parsing each with layout-aware extraction, so headings, numbering and defined terms survive intact. Every clause is indexed and aligned to its counterpart across both documents, producing an exact map of what changed: what was added, what was quietly dropped, and what shifted just enough to move the risk.";
+const BODY_BEFORE =
+  "ClauseLens reads two versions of the same contract at once — the prior draft and the redline — parsing each with layout-aware extraction, so headings, numbering and defined terms survive intact. Every clause is indexed and aligned to its counterpart across both documents, producing ";
+const BODY_MARK = "an exact map of what changed";   // highlighted, like a marked-up clause
+const BODY_AFTER =
+  ": what was added, what was quietly dropped, and what shifted just enough to move the risk.";
 
 const ease = (t) => (t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2);
 const lerp = (a, b, t) => a + (b - a) * t;
@@ -55,30 +58,48 @@ function readingPos(p, g) {
   };
 }
 
+// The document: a policy sheet in a leather folder, with a wax seal, twine and a
+// fountain pen (public/policy-folder.webp: a picture with its printed text
+// removed). Our text sits where the picture's text was: right of the twine, with
+// the body flowing around the pen. Percentages are of the picture (1079 x 1457).
+// (padding percentages are of the width: top 27% of the height = 36.5% of the width)
+const PAPER = { aspect: 1079 / 1457, left: "22%", right: "9%", top: "36.5%" };
+
 function Sheet({ sharp, bodyRef }) {
+  const ink = sharp ? "var(--color-ink)" : "var(--color-ink-dim)";
+  const hide = { opacity: sharp ? 0 : 1 };
   return (
-    <div
-      className={
-        sharp
-          ? "px-9 py-12 md:px-10 md:py-16"
-          : "px-9 py-12 md:px-10 md:py-16 rounded-[3px] bg-(--color-surface) border border-(--color-line) shadow-[0_28px_70px_-24px_rgba(41,36,29,0.35)]"
-      }
-    >
-      <div
-        className={`font-mono text-[11px] tracking-[0.22em] uppercase mb-3 ${
-          sharp ? "opacity-0" : "text-(--color-ink-faint)"
-        }`}
-      >
-        {TITLE}
+    <div className="absolute inset-0" style={{ paddingLeft: PAPER.left, paddingRight: PAPER.right, paddingTop: PAPER.top }}>
+      <div className="h-full">
+        {/* keeps the text off the pen: an empty float at the pen's place (from 62% of the
+            picture down, right of 76%), so the lines below it get shorter */}
+        <div className="float-right w-0" style={{ height: "48%" }} />
+        <div className="float-right clear-right h-full" style={{ width: "25%" }} />
+
+        <div className="text-center" style={hide}>
+          <div className="font-serif font-semibold text-[12px] md:text-[13.5px] tracking-[0.02em] uppercase whitespace-nowrap text-(--color-ink)">
+            {TITLE}
+          </div>
+          <div className="mt-1 font-serif-text text-[11.5px] md:text-[12.5px] text-(--color-ink-dim)">
+            Version 2.0 | ClauseLens
+          </div>
+          <div className="mt-3 h-px bg-(--color-ink)/60" />
+        </div>
+        <div className="mt-3 mb-1 font-serif font-semibold text-[14px] md:text-[15.5px] text-(--color-ink)" style={hide}>
+          Clause 1: How it reads
+        </div>
+        <p
+          ref={bodyRef}
+          className="font-serif-text text-[12px] md:text-[13px] leading-[1.6] text-left"
+          style={{ color: ink }}
+        >
+          {BODY_BEFORE}
+          <span className="rounded-[3px] px-0.5 font-semibold" style={{ background: sharp ? "transparent" : "rgba(136,46,58,0.2)" }}>
+            {BODY_MARK}
+          </span>
+          {BODY_AFTER}
+        </p>
       </div>
-      <div className={`h-px mb-6 ${sharp ? "opacity-0" : "bg-(--color-line)"}`} />
-      <p
-        ref={bodyRef}
-        className="font-serif-text text-lg md:text-xl leading-[1.9] text-justify"
-        style={sharp ? { color: "var(--color-ink)" } : { color: "var(--color-ink-dim)" }}
-      >
-        {BODY}
-      </p>
     </div>
   );
 }
@@ -202,10 +223,14 @@ export default function DocumentLensScan({ className = "" }) {
       <div
         ref={wrapRef}
         aria-hidden="true"
-        className="absolute top-1/2 -translate-y-1/2 left-[50%] right-[6%] max-w-[460px]"
+        className="absolute top-1/2 -translate-y-1/2 left-[52%] right-[5%] max-w-[500px]"
       >
-        {/* the document sheet — soft blurred ghost text */}
-        <div style={{ filter: "blur(2.4px)", opacity: 0.9 }}>
+        {/* the document: the folder picture, with soft blurred ghost text on it */}
+        <div
+          className="relative bg-contain bg-no-repeat bg-center drop-shadow-[0_28px_40px_rgba(41,36,29,0.3)]"
+          style={{ aspectRatio: PAPER.aspect, backgroundImage: "url(/policy-folder.webp)" }}
+        />
+        <div className="absolute inset-0" style={{ filter: "blur(2px)", opacity: 0.85 }}>
           <Sheet bodyRef={bodyEl} />
         </div>
 
