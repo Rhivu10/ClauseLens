@@ -1,95 +1,106 @@
 import { STATUS_LABEL, STATUS_COLOR } from "./rows";
 import HighlightedText from "./HighlightedText";
 
-// The alignment view drawn as an open book (a photo, public/book.png): left page =
-// document A, right page = document B, meeting at the spine. Each clause pair's
-// match status is a sticky note poking out of the nearest fore-edge, and the
-// impact summary is an editor's footnote across the gutter.
+// The alignment view drawn as two documents laid side by side on the desk: the
+// previous version on the left sheet, the new version on the right, each a small
+// stack of paper. Clause pairs line up across the two sheets; each pair's match
+// status is a sticky note on the outer edge, and its impact summary is a memo
+// card pinned across the gap between the sheets.
 
-// Slices of public/book.png (625 x 476): cover + page stack on each side (equal, so
-// the spine stays in the middle), page tops and bottoms. The middle stretches.
-const BOOK = { top: 14, side: 40, bottom: 18 };
+const GAP = 56; // px between the two sheets
+
+function Sheet({ side }) {
+  // one stack of paper (behind the text): the top sheet plus two peeking out under it
+  const pos = side === "left" ? { left: 0 } : { right: 0 };
+  const tilt = side === "left" ? -1 : 1;
+  return (
+    <div className="absolute inset-y-0 pointer-events-none" style={{ ...pos, width: `calc(50% - ${GAP / 2}px)` }} aria-hidden="true">
+      <div
+        className="absolute inset-0 rounded-[3px] bg-[#f4efe7] border border-(--color-ink)/10"
+        style={{ transform: `translate(${tilt * 7}px, 9px) rotate(${tilt * 0.9}deg)` }}
+      />
+      <div
+        className="absolute inset-0 rounded-[3px] bg-[#f8f4ee] border border-(--color-ink)/10"
+        style={{ transform: `translate(${tilt * 3}px, 4px) rotate(${tilt * 0.4}deg)` }}
+      />
+      <div className="absolute inset-0 rounded-[3px] bg-[#fffdf9] border border-(--color-ink)/10 shadow-[0_24px_48px_-24px_rgba(41,36,29,0.35)]" />
+    </div>
+  );
+}
 
 export default function SideBySideDiff({ documents, rows, highlight }) {
   return (
-    <div className="relative mx-auto max-w-4xl my-2">
-      {/* the open book (public/book.png): a 9-slice frame, so the page edges, cover
-          and spine stay sharp while the book grows to fit every clause */}
-      <div
-        className="relative drop-shadow-[0_30px_40px_rgba(41,36,29,0.22)]"
-        style={{
-          borderStyle: "solid",
-          borderWidth: `${BOOK.top}px ${BOOK.side}px ${BOOK.bottom}px`,
-          borderImage: `url(/book.png) ${BOOK.top} ${BOOK.side} ${BOOK.bottom} fill / ${BOOK.top}px ${BOOK.side}px ${BOOK.bottom}px stretch`,
-        }}
-      >
-        <div className="relative">
-          {/* running heads */}
-          <div className="grid grid-cols-2 border-b border-(--color-ink)/10 font-mono text-[10px] uppercase tracking-[0.2em] text-(--color-ink-faint)">
-            <div className="pl-10 pr-16 py-3.5 truncate">{documents.document_a.label}</div>
-            <div className="pl-16 pr-10 py-3.5 text-right truncate">{documents.document_b.label}</div>
-          </div>
+    <div className="mx-auto max-w-6xl my-4 pb-4 px-4 sm:px-16">
+      <div className="relative">
+      <Sheet side="left" />
+      <Sheet side="right" />
 
-          {rows.map((row) => {
-            const accent = STATUS_COLOR[row.status];
-            const paired = row.chunkA && row.chunkB;
-            const noteSide = row.chunkB ? "right" : "left";
-            return (
-              <section
-                key={row.id}
-                id={`change-${row.change_id}`}
-                className={`relative grid grid-cols-2 border-t border-(--color-ink)/10 first-of-type:border-t-0 scroll-mt-24 transition-colors duration-700 ${
-                  highlight && highlight === row.change_id ? "bg-(--color-brass)/10" : ""
-                }`}
-              >
-                <StickyNote side={noteSide} accent={accent} label={STATUS_LABEL[row.status]} />
+      <div className="relative grid grid-cols-2" style={{ columnGap: GAP }}>
+        {/* letterheads */}
+        <Letterhead label={documents.document_a.label} sub="Previous version" />
+        <Letterhead label={documents.document_b.label} sub="New version" />
 
-                <Page side="left">
-                  {row.chunkA ? (
-                    <>
-                      <Head chunk={row.chunkA} score={row.score} accent={accent} />
-                      {paired ? (
-                        <HighlightedText
-                          self={row.chunkA.text}
-                          other={row.chunkB.text}
-                          mode="del"
-                          className="text-justify"
-                        />
-                      ) : (
-                        <p className="font-serif-text text-[15px] leading-relaxed text-(--color-ink) text-justify">
-                          {row.chunkA.text}
-                        </p>
-                      )}
-                    </>
-                  ) : (
-                    <Absent />
-                  )}
-                </Page>
+        {rows.map((row) => {
+          const accent = STATUS_COLOR[row.status];
+          const paired = row.chunkA && row.chunkB;
+          const noteSide = row.chunkB ? "right" : "left";
+          const lit = highlight && highlight === row.change_id ? "bg-(--color-brass)/[0.06]" : "";
+          return (
+            <section
+              key={row.id}
+              id={`change-${row.change_id}`}
+              className="relative col-span-2 grid grid-cols-subgrid scroll-mt-24"
+            >
+              <StickyNote side={noteSide} accent={accent} label={STATUS_LABEL[row.status]} />
 
-                <Page side="right">
-                  {row.chunkB ? (
-                    <>
-                      <Head chunk={row.chunkB} accent={accent} align="right" />
-                      {paired ? (
-                        <HighlightedText
-                          self={row.chunkB.text}
-                          other={row.chunkA.text}
-                          mode="ins"
-                          className="text-justify"
-                        />
-                      ) : (
-                        <p className="font-serif-text text-[15px] leading-relaxed text-(--color-ink) text-justify">
-                          {row.chunkB.text}
-                        </p>
-                      )}
-                    </>
-                  ) : (
-                    <Absent />
-                  )}
-                </Page>
+              <Page side="left" className={lit}>
+                {row.chunkA ? (
+                  <>
+                    <Head chunk={row.chunkA} score={row.score} accent={accent} />
+                    {paired ? (
+                      <HighlightedText
+                        self={row.chunkA.text}
+                        other={row.chunkB.text}
+                        mode="del"
+                        className="text-justify"
+                      />
+                    ) : (
+                      <p className="font-serif-text text-[15px] leading-relaxed text-(--color-ink) text-justify">
+                        {row.chunkA.text}
+                      </p>
+                    )}
+                  </>
+                ) : (
+                  <Absent />
+                )}
+              </Page>
 
-                {/* editor's footnote across the gutter: the Node 5 impact summary */}
-                <div className="col-span-2 px-10 pt-1 pb-6">
+              <Page side="right" className={lit}>
+                {row.chunkB ? (
+                  <>
+                    <Head chunk={row.chunkB} accent={accent} />
+                    {paired ? (
+                      <HighlightedText
+                        self={row.chunkB.text}
+                        other={row.chunkA.text}
+                        mode="ins"
+                        className="text-justify"
+                      />
+                    ) : (
+                      <p className="font-serif-text text-[15px] leading-relaxed text-(--color-ink) text-justify">
+                        {row.chunkB.text}
+                      </p>
+                    )}
+                  </>
+                ) : (
+                  <Absent />
+                )}
+              </Page>
+
+              {/* the impact summary: a memo card pinned across the gap */}
+              <div className="col-span-2 px-8 pb-6 pt-1">
+                <div className="relative mx-auto max-w-3xl rounded-[3px] border border-(--color-ink)/10 bg-(--color-surface) px-5 py-3 shadow-[0_6px_16px_-8px_rgba(41,36,29,0.3)]">
+                  <span className="absolute -top-1.5 left-1/2 -translate-x-1/2 w-2.5 h-2.5 rounded-full bg-(--color-accent) shadow-[0_1px_2px_rgba(41,36,29,0.4)]" aria-hidden="true" />
                   <Meta row={row} />
                   {row.pending ? (
                     <p className="font-serif-text italic text-[13.5px] leading-snug text-(--color-ink-faint) flex items-center gap-2">
@@ -107,11 +118,22 @@ export default function SideBySideDiff({ documents, rows, highlight }) {
                     </p>
                   )}
                 </div>
-              </section>
-            );
-          })}
-        </div>
+              </div>
+            </section>
+          );
+        })}
       </div>
+      </div>
+    </div>
+  );
+}
+
+function Letterhead({ label, sub }) {
+  return (
+    <div className="px-10 pt-8 pb-4">
+      <div className="font-serif text-xl tracking-wide uppercase text-(--color-ink) truncate">{label}</div>
+      <div className="mt-1 font-mono text-[10px] uppercase tracking-[0.2em] text-(--color-ink-faint)">{sub}</div>
+      <div className="mt-3 h-px bg-(--color-ink)/15" />
     </div>
   );
 }
@@ -136,7 +158,7 @@ function StickyNote({ side, accent, label }) {
   return (
     <span
       className={`absolute top-8 z-20 select-none px-2.5 py-1.5 font-mono text-[10px] uppercase tracking-wider leading-none
-        shadow-[2px_4px_10px_rgba(41,36,29,0.22)] ${isRight ? "-right-6 rotate-[2.5deg]" : "-left-6 -rotate-[2.5deg]"}`}
+        shadow-[2px_4px_10px_rgba(41,36,29,0.22)] ${isRight ? "-right-14 rotate-[2.5deg]" : "-left-14 -rotate-[2.5deg]"}`}
       style={{
         background: `color-mix(in srgb, ${accent} 15%, var(--color-surface))`,
         color: accent,
@@ -148,9 +170,8 @@ function StickyNote({ side, accent, label }) {
   );
 }
 
-function Page({ side, children }) {
-  const pad = side === "left" ? "pl-10 pr-16" : "pl-16 pr-10";
-  return <div className={`${pad} pt-7 pb-3`}>{children}</div>;
+function Page({ children, className = "" }) {
+  return <div className={`px-10 pt-5 pb-3 transition-colors duration-700 ${className}`}>{children}</div>;
 }
 
 function Head({ chunk, score, accent, align = "left" }) {
