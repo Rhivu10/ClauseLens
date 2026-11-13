@@ -2,7 +2,8 @@
 // second process is needed.
 //
 //   GET  /api/setup    is the Kaggle tool installed and signed in?
-//   POST /api/job      start a comparison: {document_a: {name, data}, document_b: {name, data}, force?}
+//   POST /api/job      start a comparison: {document_a: {name, data}, document_b: {name, data}, force?, skipLegalCheck?}
+//                      422 {code: "not_legal", files} when a PDF doesn't look like a legal document
 //                      (data = the PDF as base64). The same two PDFs again return the saved
 //                      report at once (state "done", cached: true) unless force is true.
 //   GET  /api/job      the current comparison: state, stage, error + the list of stages
@@ -12,6 +13,7 @@
 //   GET  /api/report/download?format=md|json|pdf   the latest report as a file (pdf: a page to print / save as PDF)
 //   GET  /api/report   the latest finished report (Node 6 UI data + run: when/how it was made), 404 if none yet
 
+import { legalCheck } from "./legal.js";
 import { STAGES, askQuestions, checkSetup, consultState, currentJob, latestReport, partialReport, reportDownload, resume, startJob } from "./kaggle.js";
 
 const MAX_BYTES = 60 * 1024 * 1024;
@@ -58,13 +60,23 @@ async function handle(req, res) {
     if (url === "/api/job" && req.method === "GET") return send(res, 200, { job: currentJob(), stages: STAGES });
     if (url === "/api/job" && req.method === "POST") {
       const body = await readBody(req);
-      const job = await startJob(
-        {
-          document_a: pdf(body.document_a, "Document A"),
-          document_b: pdf(body.document_b, "Document B"),
-        },
-        { force: Boolean(body.force) }
-      );
+      const files = {
+        document_a: pdf(body.document_a, "Document A"),
+        document_b: pdf(body.document_b, "Document B"),
+      };
+      // Legal-document check (server/legal.js): flag a PDF with none of the marker
+      // words before anything goes to Kaggle; the user can still run it anyway
+      if (!body.skipLegalCheck) {
+        const flagged = [];
+        for (const f of Object.values(files)) if (!(await legalCheck(f.buffer)).legal) flagged.push(f.name);
+        if (flagged.length)
+          return send(res, 422, {
+            code: "not_legal",
+            files: flagged,
+            error: `${flagged.join(" and ")} ${flagged.length > 1 ? "don't" : "doesn't"} look like a legal document.`,
+          });
+      }
+      const job = await startJob(files, { force: Boolean(body.force) });
       return send(res, 202, { job, stages: STAGES });
     }
     if (url === "/api/consult" && req.method === "GET") return send(res, 200, { ...consultState(), stages: STAGES });

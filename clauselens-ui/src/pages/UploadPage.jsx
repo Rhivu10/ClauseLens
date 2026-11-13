@@ -47,7 +47,8 @@ export default function UploadPage() {
   const [run, setRun] = useState(null);           // {job, stages} while a comparison is shown
   const [error, setError] = useState(null);
   const [sending, setSending] = useState(false);
-  const [force, setForce] = useState(false);     // run on Kaggle even if these PDFs were compared before
+  const [force, setForce] = useState(false);
+  const [notLegal, setNotLegal] = useState(null);   // file names that don't look like legal documents     // run on Kaggle even if these PDFs were compared before
   const ready = fileA && fileB && setup?.ok && !sending;
 
   // Kaggle tool signed in? A run already going (e.g. after a page reload)?
@@ -74,15 +75,17 @@ export default function UploadPage() {
     return () => clearInterval(t);
   }, [running, navigate]);
 
-  const handleRun = async () => {
+  const handleRun = async (skipLegalCheck = false) => {
     setError(null);
+    setNotLegal(null);
     setSending(true);
     try {
-      const r = await startJob(fileA, fileB, force);
+      const r = await startJob(fileA, fileB, force, skipLegalCheck);
       if (r.job?.state === "done") return navigate("/compare");   // same PDFs as before: saved report
       setRun(r);
     } catch (e) {
-      setError(e.message);
+      if (e.body?.code === "not_legal") setNotLegal(e.body.files);
+      else setError(e.message);
     } finally {
       setSending(false);
     }
@@ -127,7 +130,7 @@ export default function UploadPage() {
       </div>
 
       <div className="mt-8 flex items-center gap-5">
-        <Button disabled={!ready} onClick={handleRun}>
+        <Button disabled={!ready} onClick={() => handleRun()}>
           {sending ? "Sending to Kaggle…" : "Run comparison"}
         </Button>
         <Link
@@ -144,6 +147,27 @@ export default function UploadPage() {
         <input type="checkbox" checked={force} onChange={(e) => setForce(e.target.checked)} className="accent-(--color-brass)" />
         Run again on Kaggle, even if these two PDFs were compared before
       </label>
+      {notLegal && (
+        <div className="mt-5 max-w-2xl rounded-xl border border-(--color-diverge)/40 bg-(--color-diverge)/5 px-5 py-4 text-sm">
+          <div className="font-medium text-(--color-diverge)">
+            {notLegal.join(" and ")} {notLegal.length > 1 ? "don't" : "doesn't"} look like a legal document
+          </div>
+          <p className="mt-1 text-(--color-ink-dim)">
+            ClauseLens compares contracts, policies and other legal documents. If this is one, you can still run it.
+          </p>
+          <div className="mt-3 flex items-center gap-4">
+            <button
+              onClick={() => handleRun(true)}
+              className="text-sm font-medium text-(--color-brass) underline underline-offset-4 hover:text-(--color-ink)"
+            >
+              Run anyway
+            </button>
+            <button onClick={() => setNotLegal(null)} className="text-sm text-(--color-ink-dim) hover:text-(--color-ink)">
+              Choose other files
+            </button>
+          </div>
+        </div>
+      )}
       {error && <p className="mt-4 text-sm text-(--color-diverge) whitespace-pre-wrap">{error}</p>}
     </div>
   );

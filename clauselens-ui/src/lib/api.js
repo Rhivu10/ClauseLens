@@ -7,6 +7,7 @@ async function request(url, options) {
   if (!res.ok) {
     const err = new Error(body.error || `Request failed (${res.status})`);
     err.status = res.status;
+    err.body = body;
     throw err;
   }
   return body;
@@ -35,7 +36,8 @@ export const askConsult = (questions) =>
 
 // force: run on Kaggle even if these two PDFs were compared before (otherwise the
 // saved report comes back at once, with job.state "done" and job.cached true)
-export async function startJob(fileA, fileB, force = false) {
+// skipLegalCheck: run even if a PDF doesn't look like a legal document (the user chose "Run anyway")
+export async function startJob(fileA, fileB, force = false, skipLegalCheck = false) {
   const [a, b] = await Promise.all([toBase64(fileA), toBase64(fileB)]);
   return request("/api/job", {
     method: "POST",
@@ -44,6 +46,7 @@ export async function startJob(fileA, fileB, force = false) {
       document_a: { name: fileA.name, data: a },
       document_b: { name: fileB.name, data: b },
       force,
+      skipLegalCheck,
     }),
   });
 }
